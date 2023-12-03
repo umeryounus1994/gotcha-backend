@@ -47,6 +47,22 @@ const userCoinDetailsSchema = new schema({
     type: String,
     default: ''
   },
+    //@Umer Added Fields for package purchase
+    PurchasePackage:{
+      type: Boolean,
+      default:false
+    },
+    PackagePrice:{
+      type: String,
+      default:""
+    },
+    PackageDate:{
+      type: Date
+    },
+    PackageExpiryDate:{
+      type: Date
+    },
+    // @Umer New Fields End
   CreationTimestamp: {
     type: Date,
     default: Date.now,
