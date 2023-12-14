@@ -337,13 +337,13 @@ exports.claim = async function (req, res) {
 
 exports.get = async function (req, res) {
   deleteExpired();
-  console.log("body ",req.body)
+  //console.log("body ",req.body)
   var userId = req.body.userId;
   var lat = req.body.latitude;
   var lng = req.body.longitude;
   var distance = parseInt(req.body.distance);
 
-  console.log("lat ",lat, ' lng: ', lng, ' distance: ',distance, ' userId: ',userId)
+  //console.log("lat ",lat, ' lng: ', lng, ' distance: ',distance, ' userId: ',userId)
   // let currentLocation = {
   //   type: 'Point',
   //   coordinates: [parseFloat(lng), parseFloat(lat)],
@@ -354,7 +354,7 @@ exports.get = async function (req, res) {
   }
 
   let currentDate = new Date();
-  console.log("currentDate ",currentDate)
+  //console.log("currentDate ",currentDate)
 //   let offerData = await Offers.find({
 //     Expire: { $gte: currentDate }, IsActive: true 
 //     })
@@ -373,7 +373,7 @@ exports.get = async function (req, res) {
   filteredOffers = []
   offerData.forEach((element) => {
     let obj = element.ClaimedBy.find(user => user.UserId == userId);
-    console.log("obj ",obj);
+    //console.log("obj ",obj);
     if(obj == undefined){
       filteredOffers.push(element);
     } else if(obj.AvailabilityTimestamp <= currentDate) {
@@ -496,7 +496,7 @@ exports.get = async function (req, res) {
 
 exports.getByTypeId = async function (req, res) {
   deleteExpired();
-  console.log("body ",req.body);
+  //console.log("body ",req.body);
   var typeId = req.body.typeId;
   var userId = req.body.userId;
   var lat = req.body.latitude;
@@ -514,7 +514,7 @@ exports.getByTypeId = async function (req, res) {
   }
 
   let currentDate = new Date();
-  console.log("currentDate ",currentDate)
+  //console.log("currentDate ",currentDate)
 //   let offerData = await Offers.find({
 //     Expire: { $gte: currentDate }, IsActive: true 
 //     })
@@ -534,7 +534,7 @@ exports.getByTypeId = async function (req, res) {
   filteredOffers = []
   offerData.forEach((element) => {
     let obj = element.ClaimedBy.find(user => user.UserId == userId);
-    console.log("obj ",obj);
+    //console.log("obj ",obj);
     if(obj == undefined){
       filteredOffers.push(element);
     } else if(obj.AvailabilityTimestamp <= currentDate) {

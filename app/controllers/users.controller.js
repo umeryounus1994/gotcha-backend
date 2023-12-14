@@ -191,7 +191,7 @@ exports.updateProfile = function (req, res) {
   //     });
   //   }
     var Id = req.body.Id;
-    console.log("body ",req.body)
+    //console.log("body ",req.body)
     Users.findOne({ _id: Id }, function (err, user) {
       if (err) {
         res.json({
