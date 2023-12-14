@@ -391,9 +391,9 @@ exports.get = async function (req, res) {
         latitude: element.Location.coordinates[1],
         longitude: element.Location.coordinates[0]
       }
-    console.log("endLocation ", endLocation)
+    //console.log("endLocation ", endLocation)
     const locationDistance = haversine(userLocation, endLocation, { unit: 'meter' })
-    console.log("locationDistance ", locationDistance)
+   // console.log("locationDistance ", locationDistance)
     if (locationDistance < distance) {
       offersList.push(element)
     }
@@ -552,9 +552,9 @@ exports.getByTypeId = async function (req, res) {
         latitude: element.Location.coordinates[1],
         longitude: element.Location.coordinates[0]
     }
-    console.log("endLocation ", endLocation)
+    //console.log("endLocation ", endLocation)
     const locationDistance = haversine(userLocation, endLocation, { unit: 'meter' })
-    console.log("locationDistance ", locationDistance)
+   // console.log("locationDistance ", locationDistance)
     if (locationDistance < distance) {
       offersList.push(element)
     }
