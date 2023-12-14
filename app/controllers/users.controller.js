@@ -41,6 +41,7 @@ exports.login = function (req, res) {
                 // PostCode: user.PostCode,
                 // Gender: user.Gender,
                 ProfilePicture: user?.ProfilePicture,
+                PurchasePackage: user?.PurchasePackage
               };
 
               let token = jwt.sign(userData, Constants.JWT.secret, {
