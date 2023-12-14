@@ -313,7 +313,7 @@ exports.wallet = function (req, res) {
               OfferEmail: offer?.Email || "",
               OfferIcon: offer?.Icon || "",
               OfferStatus: offer?.Status || "",
-              OfferSettled: offer?.IsSettled || "",
+              OfferSettled: offer?.IsSettled || false,
               CreationTimestamp: offer?.CreationTimestamp || ""
             };
 
