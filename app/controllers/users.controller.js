@@ -301,20 +301,20 @@ exports.wallet = function (req, res) {
 
           data.forEach((offer) => {
             let temp = {
-              SponsorId: offer.OfferedBy._id,
-              SponsorName: offer.OfferedBy.BusinessName,
-              SponsorLogo: offer.OfferedBy.BusinessLogo,
-              SponsorNumber: offer.OfferedBy.ContactNumber,
-              OfferType: offer?.Type?.Name,
-              OfferId: offer._id,
-              OfferValue: offer.Value,
-              OfferLink: offer.Link,
-              OfferName: offer.Name,
-              OfferEmail: offer.Email,
-              OfferIcon: offer.Icon,
-              OfferStatus: offer.Status,
-              OfferSettled: offer.IsSettled,
-              CreationTimestamp: offer.CreationTimestamp
+              SponsorId: offer.OfferedBy?._id || "",
+              SponsorName: offer.OfferedBy?.BusinessName || "",
+              SponsorLogo: offer.OfferedBy?.BusinessLogo || "",
+              SponsorNumber: offer.OfferedBy?.ContactNumber || "",
+              OfferType: offer?.Type?.Name || "",
+              OfferId: offer?._id || "",
+              OfferValue: offer?.Value || "",
+              OfferLink: offer?.Link || "",
+              OfferName: offer?.Name || "",
+              OfferEmail: offer?.Email || "",
+              OfferIcon: offer?.Icon || "",
+              OfferStatus: offer?.Status || "",
+              OfferSettled: offer?.IsSettled || "",
+              CreationTimestamp: offer?.CreationTimestamp || ""
             };
 
             walletOffers.push(temp);
