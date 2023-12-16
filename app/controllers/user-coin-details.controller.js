@@ -89,8 +89,8 @@ exports.listAllUser = function (req, res) {
       let finalD = [];
       for (const d of data) {
         const us = await usersModel.findOne({ _id: new ObjectId(d._id) });
-        d.PurchasePackage = us.PurchasePackage;
-        d.PackagePrice = us.PackagePrice;
+        d.PurchasePackage = us.PurchasePackage || false;
+        d.PackagePrice = us.PackagePrice || "";
         finalD.push(d);
       }
       res.json({
