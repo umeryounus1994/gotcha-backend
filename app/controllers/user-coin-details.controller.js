@@ -1,6 +1,8 @@
 let userCoinDetails = require("../models/user-coin-details.view");
 var ObjectId = require('mongodb').ObjectID;
 const excel = require('node-excel-export');
+const usersModel = require("../models/users.model");
+const { ObjectID } = require("mongoose/lib/schema/index");
 
 exports.list = function (req, res) {
   var query = {TotalCoin: {$gt: 0},  IsActive: true};
@@ -76,7 +78,7 @@ exports.listAllUser = function (req, res) {
   var selection = {
     ClaimedCoinList: 0,
   };
-  userCoinDetails.find(query, selection, function (err, data) {
+  userCoinDetails.find(query, selection, async function (err, data) {
     if (err) {
       res.json({
         success: false,
@@ -84,10 +86,17 @@ exports.listAllUser = function (req, res) {
         data: err,
       });
     } else {
+      let finalD = [];
+      for (const d of data) {
+        const us = await usersModel.findOne({ _id: new ObjectId(d._id) });
+        d.PurchasePackage = us.PurchasePackage;
+        d.PackagePrice = us.PackagePrice;
+        finalD.push(d);
+      }
       res.json({
         success: true,
-        message: data.length + " Records Found.",
-        data: data,
+        message: finalD.length + " Records Found.",
+        data: finalD,
       });
     }
   })

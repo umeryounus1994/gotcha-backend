@@ -58,7 +58,6 @@ app.listen(port, function () {
 });
 
 offersClaimedModel.updateMany({Status: "pending"}).then((offers) => {
-console.log("Offers updated: ", offers);
 }).catch((err) => {
 console.log("Error updating offers: ", err);
 });
