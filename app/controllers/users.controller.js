@@ -814,9 +814,10 @@ exports.socialLogin = function (req, res) {
 
 // @Umer Purchase Package
 exports.purchasePackage = function (req, res) {
-  var Email = req.body.Email;
+  var EmailList = req.body.Email;
 
-  if(!Email) {
+
+  if(!EmailList) {
     return res.json({
       success: false,
       message: "Email is required",
@@ -830,45 +831,50 @@ exports.purchasePackage = function (req, res) {
       data: null,
     });
   }
-
-  Users.findOne({ Email: Email }, function (err, user) {
-    if (err) res.send(err);
-    else {
-      if (user) {
-        var userId = user._id;
-   
-        var selection = { _id: userId };
-        var updatedData = { PurchasePackage: true,
-          PackagePrice: req.body.PackagePrice,
-          PackageDate: req.body.PackageDate || new Date(),
-          PackageExpiryDate: req.body.PackageExpiryDate || new Date() };
-        Users.updateOne(
-          selection,
-          updatedData,
-          function callback(errr, doc) {
-            if (errr) {
-              res.json({
-                success: false,
-                message: "Validation Error",
-                data: errr,
-              });
-            } else {
-              res.json({
-                success: true,
-                message:
-                  "Package has been purchase successfully",
-                data: null,
-              });
+  const promiseArr = [];
+  return new Promise((resolve, reject) => {
+    for (let key in EmailList) {
+      promiseArr.push(
+        new Promise(async (resolvve, rejectt) => {
+          Users.findOne({ Email: EmailList[key] }, function (err, user) {
+            if (err) rejectt(false);
+            else {
+              if (user) {
+                var userId = user._id;
+           
+                var selection = { _id: userId };
+                var updatedData = { PurchasePackage: true,
+                  PackagePrice: req.body.PackagePrice,
+                  PackageDate: req.body.PackageDate || new Date(),
+                  PackageExpiryDate: req.body.PackageExpiryDate || new Date() };
+                Users.updateOne(
+                  selection,
+                  updatedData,
+                  function callback(errr, doc) {
+                    if (errr) {
+                      rejectt(false)
+                    } else {
+                      resolvve(true);
+                    }
+                  }
+                );
+              } else {
+                rejectt(false)
+              }
             }
-          }
-        );
-      } else {
-        res.json({
-          success: false,
-          message: "No User Found",
-          data: null,
-        });
-      }
+          });
+            resolvve(true);
+        })
+    )
     }
+      return Promise.all(promiseArr).then(ress => {
+          return res.json({
+              status: true,
+              message: "Package has been purchase successfully",
+              data: null
+          })
+      })
   });
+
+ 
 };
