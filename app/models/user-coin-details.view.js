@@ -47,6 +47,14 @@ const userCoinDetailsSchema = new schema({
     type: String,
     default: ''
   },
+  AccountNumber:{
+    type: String, 
+    default:""
+  },
+  BSB:{
+    type: String,
+    default:""
+  },
     //@Umer Added Fields for package purchase
     PurchasePackage:{
       type: Boolean,
