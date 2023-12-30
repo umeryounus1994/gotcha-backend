@@ -1,6 +1,6 @@
 const sgMail = require('@sendgrid/mail')
 
-const sgMailApiKey = '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'
+const sgMailApiKey = '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'
 
 sgMail.setApiKey(sgMailApiKey)
 
@@ -9,10 +9,10 @@ module.exports.sendEmail = (email, password, fullName) => {
     
     sgMail.send({
       to: email,
-      from: { name: 'TagTap AR', email: 'tag.tap.app@gmail.com' } ,
+      from: 'support@trygotcha.com' ,
       subject: 'TagTap AR - Password Reset',
-      text: `Hello ${fullName}, <br> Welocome to TagTap AR Application. <br> Your new password is: ${password} `,
-      html: `<p>Hello ${fullName}, <br> Welocome to TagTap AR Application. <br>Your new password is: <b>${password}</b></p>`
+      text: `Hello ${fullName}, <br> Welcome to TagTap AR Application. <br> Your new password is: ${password} `,
+      html: `<p>Hello ${fullName}, <br> Welcome to TagTap AR Application. <br>Your new password is: <b>${password}</b></p>`
 
     }).then(() => {}, error => {
         console.error(error);
@@ -32,7 +32,6 @@ module.exports.sendTemplate = (to,from, templateId, dynamic_template_data) => {
     templateId,
     dynamic_template_data
   };
-  console.log(msg)
   sgMail.send(msg)
     .then((response) => {
       console.log('mail-sent-successfully', {templateId, dynamic_template_data });
