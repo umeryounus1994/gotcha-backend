@@ -92,6 +92,7 @@ exports.listAllUser = function (req, res) {
         d.PurchasePackage = us.PurchasePackage || false;
         d.PackagePrice = us.PackagePrice || "";
         d.AccountNumber = us.AccountNumber || "";
+        d.PackageExpiryDate = us.PackageExpiryDate || "";
         d.BSB = us.BSB || "";
         finalD.push(d);
       }
