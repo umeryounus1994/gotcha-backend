@@ -3,7 +3,7 @@ var ObjectId = require('mongodb').ObjectID;
 const excel = require('node-excel-export');
 const usersModel = require("../models/users.model");
 const { ObjectID } = require("mongoose/lib/schema/index");
-
+var moment = require('moment');
 exports.list = function (req, res) {
   var query = {TotalCoin: {$gt: 0},  IsActive: true};
   var selection = {
@@ -87,8 +87,17 @@ exports.listAllUser = function (req, res) {
       });
     } else {
       let finalD = [];
+      var currDate = moment();
       for (const d of data) {
         const us = await usersModel.findOne({ _id: new ObjectId(d._id) });
+        if(us.PackageExpiryDate){
+          var cDate = moment(d.PackageExpiryDate);
+          if(cDate < currDate){
+            d.PurchasePackageExpired = false
+          } else {
+            d.PurchasePackageExpired = true;
+          }
+        }
         d.PurchasePackage = us.PurchasePackage || false;
         d.PackagePrice = us.PackagePrice || "";
         d.AccountNumber = us.AccountNumber || "";

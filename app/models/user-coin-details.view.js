@@ -70,6 +70,10 @@ const userCoinDetailsSchema = new schema({
     PackageExpiryDate:{
       type: Date
     },
+    PurchasePackageExpired:{
+      type: Boolean,
+      default:false
+    },
     // @Umer New Fields End
   CreationTimestamp: {
     type: Date,
