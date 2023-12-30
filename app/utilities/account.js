@@ -7,7 +7,6 @@ sgMail.setApiKey(sgMailApiKey)
 // ${price}
 module.exports.sendEmail = (email, password, fullName) => {
     
-  console.log(email +" : "+password)
     sgMail.send({
       to: email,
       from: { name: 'TagTap AR', email: 'tag.tap.app@gmail.com' } ,

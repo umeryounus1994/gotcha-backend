@@ -91,6 +91,8 @@ exports.listAllUser = function (req, res) {
         const us = await usersModel.findOne({ _id: new ObjectId(d._id) });
         d.PurchasePackage = us.PurchasePackage || false;
         d.PackagePrice = us.PackagePrice || "";
+        d.AccountNumber = us.AccountNumber || "";
+        d.BSB = us.BSB || "";
         finalD.push(d);
       }
       res.json({

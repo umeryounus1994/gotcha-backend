@@ -611,8 +611,6 @@ exports.forgetPassword = function (req, res) {
                   });
                 } else {
                   EmailAccount.sendEmail(Email, newPassword, userFullName)
-                  // mailer.sendMail(Email, newPassword, userFullName);
-                  console.log("User Password Updated.");
                   res.json({
                     success: true,
                     message:
