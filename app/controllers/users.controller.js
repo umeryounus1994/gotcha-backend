@@ -744,6 +744,8 @@ exports.socialLogin = function (req, res) {
             ETHAddress: user.ETHAddress,
             AccountNumber: user.AccountNumber,
             BSB: user.BSB,
+            ProfilePicture: user?.ProfilePicture,
+            PurchasePackage: user?.PurchasePackage
           };
 
           let token = jwt.sign(userData, Constants.JWT.secret, {
