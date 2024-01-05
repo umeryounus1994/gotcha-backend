@@ -19,7 +19,6 @@ exports.add = function (req, res) {
         data: err,
       });
     } else {
-      console.log('New Package Added.');
       res.json({
         success: true,
         message: 'Successfully Added!',
@@ -69,7 +68,6 @@ exports.update = function (req, res) {
         data: errr,
       });
     } else {
-      console.log('Package Updated.');
       res.json({
         success: true,
         message: 'Successfully Updated!',
@@ -90,7 +88,6 @@ exports.delete = function (req, res) {
         data: err,
       });
     } else {
-      console.log('Package Deleted.');
       res.json({
         success: true,
         message: 'Successfully Deleted!',

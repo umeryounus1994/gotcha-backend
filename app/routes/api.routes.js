@@ -47,11 +47,8 @@ var message = {
 // registration token.
 admin.messaging().send(message)
  .then((response) => {
-   // Response is a message ID string.
-   console.log('Successfully sent message:', response);
  })
  .catch((error) => {
-   console.log('Error sending message:', error);
  });
 
 }
@@ -114,14 +111,12 @@ function (req, res) {
 
       offersController.addOffer(offers, function (err, result) {
       if (err) {
-          console.log(err);
           return res.json({
               message: "Error in Connecting to DB",
               status: false
           });
       }
       else{
-        console.log('New Offer Added.');
         res.json({
           success: true,
           message: 'Successfully Added!',
@@ -167,13 +162,6 @@ authRoutes
   .route("/sponsors/forgetPassword")
   .post(sponsorsController.forgetPassword);
 
-// Admin:
-// router.route('/admin/login').post(adminController.login);
-// router.route('/admin/register').post(adminController.register);
-// router.route('/admin/updateStatus').post(adminController.updateStatus);
-// router.route('/admin/update').post(adminController.update);
-// router.route('/admins').get(adminController.list);
-
 // Offer Types:
 authRoutes.post('/offerTypes',
   mediaUpload.fields([
@@ -187,7 +175,6 @@ authRoutes.post('/offerTypes',
   function (req, res) {
 
     var offerTypeForm = req.body;
-    console.log(offerTypeForm)
 
     if (req.files && req.files.ModelPicture) {
       offerTypeForm.ModelPicture = req.files.ModelPicture[0].location;
@@ -195,19 +182,16 @@ authRoutes.post('/offerTypes',
 
     if (req.files && req.files.AppPicture) {
       offerTypeForm.AppPicture = req.files.AppPicture[0].location;
-      console.log("AppPicture ", req.files.AppPicture[0].location)
     }
 
     offerTypesController.addOfferType(offerTypeForm, function (err, result) {
       if (err) {
-        console.log(err);
         return res.json({
           message: "Error in Connecting to DB",
           success: false
         });
       }
       else {
-        console.log('New Offer Type Added.');
         res.json({
           success: true,
           message: 'Successfully Added!',
@@ -233,28 +217,23 @@ authRoutes.patch('/offerTypes/updateImage/:id',
 
     var offerTypeId = req.params.id;
     var offerTypeForm = req.body;
-    console.log(offerTypeForm)
 
     if (req.files && req.files.ModelPicture) {
       offerTypeForm.ModelPicture = req.files.ModelPicture[0].location;
-      console.log("ModelPicture ", req.files.ModelPicture[0].location)
     }
 
     if (req.files && req.files.AppPicture) {
       offerTypeForm.AppPicture = req.files.AppPicture[0].location;
-      console.log("AppPicture ", req.files.AppPicture[0].location)
     }
 
     offerTypesController.updateOfferType(offerTypeId, offerTypeForm, { new: true }, function (err, result) {
       if (err) {
-        console.log(err);
         return res.json({
           message: "Error in Connecting to DB",
           success: false
         });
       }
       else {
-        console.log('Offer Type Updated.');
         res.json({
           success: true,
           message: 'Successfully Updated!',
@@ -313,7 +292,6 @@ authRoutes.patch('/markerTypes/updateImage/:id',
 
     var markerTypeId = req.params.id;
     var markerTypeForm = req.body;
-    console.log(markerTypeForm)
 
     if (req.files && req.files.Picture) {
       markerTypeForm.Picture = req.files.Picture[0].location;
@@ -321,7 +299,6 @@ authRoutes.patch('/markerTypes/updateImage/:id',
 
     markerTypesController.updateMarkerType(markerTypeId, markerTypeForm, { new: true }, function (err, result) {
       if (err) {
-        console.log(err);
         return res.json({
           message: "Error in Connecting to DB",
           success: false
@@ -367,7 +344,6 @@ async function (req, res) {
   
   var userForm = req.body;
   var userId = req.params.userId;
-  console.log("userForm",userForm)
   if(req.files && req.files.ProfilePicture){
     userForm.ProfilePicture = req.files.ProfilePicture[0].location;
   }
@@ -390,7 +366,6 @@ async function (req, res) {
             result.Password = hash
             await result.save();
           })
-          console.log("userForm", userForm)
         }
         let reqData = {
           Id: result._id,
@@ -405,7 +380,6 @@ async function (req, res) {
           // PostCode: result.PostCode,
           // Gender: result.Gender,
         }
-        console.log("result", result);
         let token = jwt.sign(reqData, Constants.JWT.secret, {
           expiresIn: "10d", // expires in 10 days
         });
@@ -429,7 +403,6 @@ mediaUpload.fields([
 async function (req, res) {
   
   var userForm = req.body;
-  console.log("userForm: ", userForm)
   let ProfilePicture;
   if(req.files && req.files.ProfilePicture){
     ProfilePicture = req.files.ProfilePicture[0].location;
@@ -493,8 +466,6 @@ async function (req, res) {
               let token = jwt.sign(userData, Constants.JWT.secret, {
                 expiresIn: "10d", // expires in 10 days
               });
-
-              console.log("New User Registered.");
               res.json({
                 success: true,
                 message: "Successfully registered!",
@@ -545,6 +516,7 @@ authRoutes.route("/users/delete").post(usersController.delete);
 authRoutes.route("/users/forgetPassword").post(usersController.forgetPassword);
 authRoutes.route("/users/updatePassword").post(usersController.updatePassword);
 authRoutes.route("/users/socialLogin").post(usersController.socialLogin);
+authRoutes.route("/users/getSingleUserDetails").post(usersController.getSingleUserDetails);
 
 // userCoinDetails (view)
 authRoutes.route("/users/system-leader-board").get(userCoinDetailsController.list);

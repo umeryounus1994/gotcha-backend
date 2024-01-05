@@ -478,6 +478,37 @@ exports.walletByCurrentDate = function (req, res) {
     });
   }
 };
+exports.getSingleUserDetails = function (req, res) {
+  console.log(req.body)
+  var UserId = req.body.UserId;
+  var query = { 
+    _id: UserId
+  };
+
+  if (UserId) {
+    Users.findOne(query, function (err, data) {
+      if (err) {
+        res.json({
+          success: false,
+          message: "Server Error",
+          data: err,
+        });
+      } else {
+        res.json({
+          success: true,
+          message:" Record Found.",
+          data: data,
+        });
+      }
+    });
+  } else {
+    res.json({
+      success: false,
+      message: "Invalid Params",
+      data: null,
+    });
+  }
+};
 
 exports.updateLocation = function (req, res) {
   var Id = req.body.Id;

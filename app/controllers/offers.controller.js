@@ -62,7 +62,6 @@ exports.add = function (req, res) {
             data: errAdd,
           });
         } else {
-          console.log('New Offer Added.');
           res.json({
             success: true,
             message: 'Successfully Added!',
@@ -83,7 +82,6 @@ exports.list = function (req, res) {
   if (lastId) {
     query = {_id: { '$gt': lastId}};
   }
-  console.log(query);
   var selection = {
     __v: 0,
   };
@@ -268,7 +266,6 @@ exports.claim = async function (req, res) {
   let updatedData;
 
   let offerData = await Offers.findById(OfferId);
-  console.log("offerData ",offerData);
   let userExist = false;
   let userExistData;
   let userExistIndex;
@@ -281,7 +278,6 @@ exports.claim = async function (req, res) {
   }
 
   offerData.ClaimedBy.forEach((element,i)=>{
-    console.log(" index ",i)
     if(element.UserId == UserId){
       userExist = true;
       userExistData = element;
@@ -309,7 +305,6 @@ exports.claim = async function (req, res) {
       });
     } else {
       // console.log("update offer doc ",doc)
-      console.log('Offer Claimed.');
       let reqData = {
         ClaimedBy: UserId,
         OfferId: offerData._id,
@@ -324,7 +319,6 @@ exports.claim = async function (req, res) {
         Icon: offerData.Icon,
       }
       const OffersClaimedDoc = await OffersClaimedModel.create(reqData);
-      console.log("OffersClaimedDoc ",OffersClaimedDoc);
 
       res.json({
         success: true,
@@ -503,7 +497,6 @@ exports.getByTypeId = async function (req, res) {
   var lng = req.body.longitude;
   var distance = parseInt(req.body.distance);
 
-  console.log("lat ",lat, ' lng: ', lng, ' distance: ',distance, ' userId: ',userId)
   // let currentLocation = {
   //   type: 'Point',
   //   coordinates: [parseFloat(lng), parseFloat(lat)],
@@ -705,7 +698,6 @@ exports.delete = function (req, res) {
         data: err,
       });
     } else {
-      console.log('Admin Offer Deleted.');
       res.json({
         success: true,
         message: 'Successfully Deleted!',
@@ -724,7 +716,6 @@ function deleteExpired() {
         var currentDate = new Date();
         var offerDate = new Date(offer.Expire);
         if (offerDate < currentDate) {
-          console.log('Expired Offer', offer._id);
           var selection = { _id: offer._id };
           Offers.deleteOne(selection, function callback(err, doc) {});
         }

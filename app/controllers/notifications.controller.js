@@ -17,7 +17,6 @@ exports.add = function (req, res) {
         data: err,
       });
     } else {
-      console.log('New Notification Added.');
       res.json({
         success: true,
         message: 'Successfully Added!',
@@ -87,7 +86,6 @@ exports.update = function (req, res) {
         data: errr,
       });
     } else {
-      console.log('Notifications Updated.');
       res.json({
         success: true,
         message: 'Successfully Updated!',

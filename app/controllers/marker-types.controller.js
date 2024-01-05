@@ -90,7 +90,6 @@ exports.update = function (req, res) {
         data: errr,
       });
     } else {
-      console.log('MarkerTypes Updated.');
       res.json({
         success: true,
         message: 'Successfully Updated!',

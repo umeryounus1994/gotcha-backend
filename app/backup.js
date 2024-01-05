@@ -93,7 +93,6 @@ exports.dbAutoBackUp = () => {
       newBackupPath;
     exec(cmd, (error, stdout, stderr) => {
       if (this.empty(error)) {
-        console.log('Database Backuped!');
 
         // check for remove old backup after keeping # of days given in configuration.
         if (dbOptions.removeOldBackup == true) {
