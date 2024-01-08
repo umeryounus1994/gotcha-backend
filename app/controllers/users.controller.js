@@ -479,7 +479,6 @@ exports.walletByCurrentDate = function (req, res) {
   }
 };
 exports.getSingleUserDetails = function (req, res) {
-  console.log(req.body)
   var UserId = req.body.UserId;
   var query = { 
     _id: UserId
