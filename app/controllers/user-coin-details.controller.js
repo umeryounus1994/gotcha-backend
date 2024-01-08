@@ -4,6 +4,8 @@ const excel = require('node-excel-export');
 const usersModel = require("../models/users.model");
 const { ObjectID } = require("mongoose/lib/schema/index");
 var moment = require('moment');
+const momenttz = require('moment-timezone');
+momenttz.tz.setDefault('Australia/Brisbane');
 exports.list = function (req, res) {
   var query = {TotalCoin: {$gt: 0},  IsActive: true};
   var selection = {
@@ -87,11 +89,11 @@ exports.listAllUser = function (req, res) {
       });
     } else {
       let finalD = [];
-      var currDate = moment();
+      var currDate = momenttz();
       for (const d of data) {
         const us = await usersModel.findOne({ _id: new ObjectId(d._id) });
         if(us.PackageExpiryDate){
-          var cDate = moment(d.PackageExpiryDate);
+          var cDate = momenttz(d.PackageExpiryDate);
           if(cDate < currDate){
             d.PurchasePackageExpired = false
           } else {
