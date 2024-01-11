@@ -506,6 +506,17 @@ exports.getSingleUserDetails = function (req, res) {
           data: err,
         });
       } else {
+        var currDate = momenttz();
+           if(data.PackageExpiryDate){
+                var cDate = momenttz(data.PackageExpiryDate);
+                if(cDate < currDate){
+                  data.PurchasePackageExpired = false
+                } else {
+                  data.PurchasePackageExpired = true;
+                }
+              } else {
+                data.PurchasePackageExpired = false;
+              }
         res.json({
           success: true,
           message:" Record Found.",

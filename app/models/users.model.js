@@ -98,6 +98,9 @@ const userSchema = new schema({
   PackageExpiryDate:{
     type: Date
   },
+  PurchasePackageExpired: {
+    type: Boolean
+  },
   // @Umer New Fields End
   IsActive: {
     type: Boolean,
