@@ -14,6 +14,8 @@ let jwt = require("jsonwebtoken");
 let Constants = require("../app.constants");
 let EmailAccount = require("../utilities/account");
 const moment = require('moment')
+const momenttz = require('moment-timezone');
+momenttz.tz.setDefault('Australia/Brisbane');
 
 // Login:
 exports.login = function (req, res) {
@@ -29,6 +31,16 @@ exports.login = function (req, res) {
         bcrypt.compare(Password, userPassword, function (err, matched) {
           if (matched) {
             if (user.IsActive) {
+              var currDate = momenttz();
+              var PurchasePackageExpired = false;
+              if(user.PackageExpiryDate){
+                var cDate = momenttz(user.PackageExpiryDate);
+                if(cDate < currDate){
+                  PurchasePackageExpired = false
+                } else {
+                  PurchasePackageExpired = true;
+                }
+              }
               let userData = {
                 Id: user._id,
                 Name: user.FullName,
@@ -41,7 +53,8 @@ exports.login = function (req, res) {
                 // PostCode: user.PostCode,
                 // Gender: user.Gender,
                 ProfilePicture: user?.ProfilePicture,
-                PurchasePackage: user?.PurchasePackage
+                PurchasePackage: user?.PurchasePackage,
+                PurchasePackageExpired: PurchasePackageExpired
               };
 
               let token = jwt.sign(userData, Constants.JWT.secret, {
@@ -766,6 +779,16 @@ exports.socialLogin = function (req, res) {
     } else {
       if (user) {
         if (user.IsActive) {
+          var currDate = momenttz();
+          var PurchasePackageExpired = false;
+           if(user.PackageExpiryDate){
+                var cDate = momenttz(user.PackageExpiryDate);
+                if(cDate < currDate){
+                  PurchasePackageExpired = false
+                } else {
+                  PurchasePackageExpired = true;
+                }
+              }
           let userData = {
             Id: user._id,
             Name: user.FullName,
@@ -775,7 +798,8 @@ exports.socialLogin = function (req, res) {
             AccountNumber: user.AccountNumber,
             BSB: user.BSB,
             ProfilePicture: user?.ProfilePicture,
-            PurchasePackage: user?.PurchasePackage
+            PurchasePackage: user?.PurchasePackage,
+            PurchasePackageExpired: PurchasePackageExpired
           };
 
           let token = jwt.sign(userData, Constants.JWT.secret, {
