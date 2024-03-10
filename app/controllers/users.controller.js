@@ -33,7 +33,7 @@ exports.login = function (req, res) {
             if (user.IsActive) {
               var currDate = momenttz();
               var PurchasePackageExpired = false;
-              if(user.PackageExpiryDate){
+              if(user.PackageExpiryDate && user.PackageExpiryDate != ""){
                 var cDate = momenttz(user.PackageExpiryDate);
                 if(cDate < currDate){
                   PurchasePackageExpired = false

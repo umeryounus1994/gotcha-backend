@@ -438,6 +438,8 @@ async function (req, res) {
           // user.PostCode = PostCode;
           // user.Gender = req.body.Gender;
           user.ContactNumber = req.body.ContactNumber;
+          user.PurchasePackage = false;
+          user.PurchasePackageExpired = true;
 
           user.save(function (err) {
             if (err) {
