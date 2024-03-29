@@ -482,6 +482,99 @@ async function (req, res) {
   });
 
 });
+
+
+authRoutes.post('/users/addUser',
+mediaUpload.fields([
+  {
+    name: 'ProfilePicture', maxCount: 1
+  }
+]), 
+async function (req, res) {
+  
+  var userForm = req.body;
+  let ProfilePicture;
+  if(req.files && req.files.ProfilePicture){
+    ProfilePicture = req.files.ProfilePicture[0].location;
+  }
+
+  Users.findOne({ Email: req.body.Email }, function (err, exist) {
+    if (err) {
+      res.json({
+        success: false,
+        message: "Validation Error",
+        data: err,
+      });
+    } else {
+      if (exist) {
+        res.json({
+          success: false,
+          message: "Email already exists!",
+          data: req.body.Email,
+        });
+      } else {
+        //Hasing Pass:
+        bcrypt.hash(req.body.Password, saltRounds, function (err, hash) {
+          //Register User:
+          var user = new Users();
+          user.ProfilePicture = ProfilePicture;
+          user.FullName = req.body.FullName;
+          user.Email = req.body.Email.toLowerCase().trim();
+          user.Password = hash;
+          user.AccountNumber = req.body.AccountNumber,
+          user.BSB = req.body.BSB,
+          // user.AreaId = AreaId;
+          // user.YearOfBirth = YearOfBirth;
+          // user.PostCode = PostCode;
+          // user.Gender = req.body.Gender;
+          user.ContactNumber = req.body.ContactNumber;
+          user.PurchasePackage = false;
+          user.PurchasePackageExpired = true;
+
+          user.save(function (err) {
+            if (err) {
+              console.log("err 2", err)
+              res.json({
+                success: false,
+                message: "Server Error",
+                data: err,
+              });
+            } else {
+              let userData = {
+                Id: user._id,
+                Name: user.FullName,
+                ContactNumber: user.ContactNumber,
+                Email: user.Email,
+                // ETHAddress: null,
+                ProfilePicture: user.ProfilePicture,
+                AccountNumber: user.AccountNumber,
+                BSB: user.BSB,
+                // AreaId: user.AreaId,
+                // YearOfBirth: user.YearOfBirth,
+                // PostCode: user.PostCode,
+                // Gender: user.Gender,
+              };
+
+              let token = jwt.sign(userData, Constants.JWT.secret, {
+                expiresIn: "10d", // expires in 10 days
+              });
+              res.json({
+                success: true,
+                message: "Successfully registered!",
+                data: userData,
+                token: token,
+              });
+            }
+          });
+        });
+      }
+    }
+  });
+
+});
+
+
+
 authRoutes.post('/users/sendNotification', function (req, res) {
   
   usersController.getAllNotificationUser(function (err, result) {
