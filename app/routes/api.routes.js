@@ -394,7 +394,7 @@ async function (req, res) {
   });
 
 });
-authRoutes.post('/users/signup',
+router.post('/users/signup',
 mediaUpload.fields([
   {
     name: 'ProfilePicture', maxCount: 1
