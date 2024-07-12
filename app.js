@@ -45,7 +45,8 @@ app.get("/", function (req, res) {
 // Use Api routes in the App
 // app.use('/api', apiRoutes);
 app.use("/api", routes.authRoutes);
-app.use("/api", Token.checkToken, routes.apiRoutes);
+// app.use("/api", Token.checkToken, routes.apiRoutes);
+app.use("/api", routes.apiRoutes);
 
 app.use((req, res, next) => {
   res.status(404).send("404 error the page resource was not found!");
