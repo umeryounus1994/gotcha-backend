@@ -440,6 +440,8 @@ async function (req, res) {
           user.ContactNumber = req.body.ContactNumber;
           user.PurchasePackage = req.body.PurchasePackage || false;
           user.PurchasePackageExpired = req.body.PurchasePackageExpired || true;
+          user.PackageDate = req.body.PackageDate || "",
+          user.PackageExpiryDate = req.body.PackageExpiryDate || ""
 
           user.save(function (err) {
             if (err) {
