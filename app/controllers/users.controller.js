@@ -313,24 +313,27 @@ exports.wallet = function (req, res) {
           let walletOffers = [];
 
           data.forEach((offer) => {
-            let temp = {
-              SponsorId: offer.OfferedBy?._id || "",
-              SponsorName: offer.OfferedBy?.BusinessName || "",
-              SponsorLogo: offer.OfferedBy?.BusinessLogo || "",
-              SponsorNumber: offer.OfferedBy?.ContactNumber || "",
-              OfferType: offer?.Type?.Name || "",
-              OfferId: offer?._id || "",
-              OfferValue: offer?.Value || 0,
-              OfferLink: offer?.Link || "",
-              OfferName: offer?.Name || "",
-              OfferEmail: offer?.Email || "",
-              OfferIcon: offer?.Icon || "",
-              OfferStatus: offer?.Status || "",
-              OfferSettled: offer?.IsSettled || false,
-              CreationTimestamp: offer?.CreationTimestamp || ""
-            };
+            if(offer?.Value > 0){
+              let temp = {
+                SponsorId: offer.OfferedBy?._id || "",
+                SponsorName: offer.OfferedBy?.BusinessName || "",
+                SponsorLogo: offer.OfferedBy?.BusinessLogo || "",
+                SponsorNumber: offer.OfferedBy?.ContactNumber || "",
+                OfferType: offer?.Type?.Name || "",
+                OfferId: offer?._id || "",
+                OfferValue: offer?.Value || 0,
+                OfferLink: offer?.Link || "",
+                OfferName: offer?.Name || "",
+                OfferEmail: offer?.Email || "",
+                OfferIcon: offer?.Icon || "",
+                OfferStatus: offer?.Status || "",
+                OfferSettled: offer?.IsSettled || false,
+                CreationTimestamp: offer?.CreationTimestamp || ""
+              };
+  
+              walletOffers.push(temp);
+            }
 
-            walletOffers.push(temp);
 
             // if (offer.Type._id == '5ecc44d56867c03a18c5f344') {
             //   other.push(temp);
@@ -425,22 +428,25 @@ exports.walletByCurrentDate = function (req, res) {
           let walletOffers = [];
 
           data.forEach((offer) => {
-            let temp = {
-              SponsorId: offer.OfferedBy._id,
-              SponsorName: offer.OfferedBy.BusinessName,
-              SponsorLogo: offer.OfferedBy.BusinessLogo,
-              SponsorNumber: offer.OfferedBy.ContactNumber,
-              OfferType: offer.Type.Name,
-              OfferId: offer._id,
-              OfferValue: offer.Value || 0,
-              OfferLink: offer.Link,
-              OfferName: offer.Name,
-              OfferEmail: offer.Email,
-              OfferIcon: offer.Icon,
-              CreationTimestamp: offer.CreationTimestamp
-            };
+            if(offer.Value > 0){
+              let temp = {
+                SponsorId: offer.OfferedBy._id,
+                SponsorName: offer.OfferedBy.BusinessName,
+                SponsorLogo: offer.OfferedBy.BusinessLogo,
+                SponsorNumber: offer.OfferedBy.ContactNumber,
+                OfferType: offer.Type.Name,
+                OfferId: offer._id,
+                OfferValue: offer.Value || 0,
+                OfferLink: offer.Link,
+                OfferName: offer.Name,
+                OfferEmail: offer.Email,
+                OfferIcon: offer.Icon,
+                CreationTimestamp: offer.CreationTimestamp
+              };
+  
+              walletOffers.push(temp);
+            }
 
-            walletOffers.push(temp);
 
             // if (offer.Type._id == '5ecc44d56867c03a18c5f344') {
             //   other.push(temp);
