@@ -313,7 +313,7 @@ exports.wallet = function (req, res) {
           let walletOffers = [];
 
           data.forEach((offer) => {
-            if(offer?.Value > 0){
+
               let temp = {
                 SponsorId: offer.OfferedBy?._id || "",
                 SponsorName: offer.OfferedBy?.BusinessName || "",
@@ -332,7 +332,6 @@ exports.wallet = function (req, res) {
               };
   
               walletOffers.push(temp);
-            }
 
 
             // if (offer.Type._id == '5ecc44d56867c03a18c5f344') {
@@ -428,7 +427,6 @@ exports.walletByCurrentDate = function (req, res) {
           let walletOffers = [];
 
           data.forEach((offer) => {
-            if(offer.Value > 0){
               let temp = {
                 SponsorId: offer.OfferedBy._id,
                 SponsorName: offer.OfferedBy.BusinessName,
@@ -445,7 +443,6 @@ exports.walletByCurrentDate = function (req, res) {
               };
   
               walletOffers.push(temp);
-            }
 
 
             // if (offer.Type._id == '5ecc44d56867c03a18c5f344') {
