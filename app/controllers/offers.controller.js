@@ -317,7 +317,11 @@ exports.claim = async function (req, res) {
         Email: offerData.Email,
         Location: offerData.Location,
         Icon: offerData.Icon,
+        Status: 'pending'
       }
+      if(parseInt(offerData.Value) < 1){
+        reqData.Status = 'requested';
+      } 
       const OffersClaimedDoc = await OffersClaimedModel.create(reqData);
 
       res.json({
