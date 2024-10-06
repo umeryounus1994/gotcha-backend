@@ -76,7 +76,33 @@ exports.listAllActive = function (req, res) {
 };
 
 exports.listAllUser = function (req, res) {
-  var query = { IsDeleted: false};
+  const { startDate, endDate } = req.query;
+
+  // Initialize the base query
+  const query = { IsDeleted: false };
+
+  // Validate and parse dates
+  if (startDate) {
+    const parsedStartDate = new Date(startDate);
+    if (!isNaN(parsedStartDate.getTime())) { // Check for valid date
+      query.CreationTimestamp = { ...query.CreationTimestamp, $gte: parsedStartDate }; // Start date
+    } else {
+      return res.status(400).json({ success: false, message: "Invalid start date format." });
+    }
+  }
+
+  if (endDate) {
+    const parsedEndDate = new Date(endDate);
+    if (!isNaN(parsedEndDate.getTime())) { // Check for valid date
+      // Initialize CreationTimestamp if it hasn't been yet
+      if (!query.CreationTimestamp) {
+        query.CreationTimestamp = {};
+      }
+      query.CreationTimestamp.$lte = parsedEndDate; // End date
+    } else {
+      return res.status(400).json({ success: false, message: "Invalid end date format." });
+    }
+  }
   var selection = {
     ClaimedCoinList: 0,
   };
