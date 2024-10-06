@@ -105,6 +105,7 @@ exports.listAllUser = function (req, res) {
         d.AccountNumber = us.AccountNumber || "";
         d.PackageExpiryDate = us.PackageExpiryDate || "";
         d.BSB = us.BSB || "";
+        d.ContactNumber = us.ContactNumber || "";
         finalD.push(d);
       }
       res.json({
