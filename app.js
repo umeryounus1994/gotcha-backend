@@ -58,7 +58,7 @@ app.listen(port, function () {
   console.log("Running Services on port " + port);
 });
 
-offersClaimedModel.updateMany({Status: "pending"}).then((offers) => {
-}).catch((err) => {
-console.log("Error updating offers: ", err);
-});
+// offersClaimedModel.updateMany({Status: "pending"}).then((offers) => {
+// }).catch((err) => {
+// console.log("Error updating offers: ", err);
+// });
