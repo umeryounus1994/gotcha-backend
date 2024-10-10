@@ -77,6 +77,14 @@ exports.listAllActive = function (req, res) {
 
 exports.listAllUser = function (req, res) {
   const { startDate, endDate } = req.query;
+  let sDate = '';
+  let eDate = ''
+  if(startDate){
+    sDate = new Date(startDate);
+  }
+  if(endDate){
+    eDate = new Date(endDate);
+  }
 
   // Initialize the base query
   const query = { IsDeleted: false };
@@ -103,10 +111,10 @@ exports.listAllUser = function (req, res) {
       return res.status(400).json({ success: false, message: "Invalid end date format." });
     }
   }
-  var selection = {
-    ClaimedCoinList: 0,
-  };
-  userCoinDetails.find(query, selection, async function (err, data) {
+  // var selection = {
+  //   ClaimedCoinList: 0,
+  // };
+  userCoinDetails.find(query, async function (err, data) {
     if (err) {
       res.json({
         success: false,
@@ -132,13 +140,34 @@ exports.listAllUser = function (req, res) {
         d.PackageExpiryDate = us.PackageExpiryDate || "";
         d.BSB = us.BSB || "";
         d.ContactNumber = us.ContactNumber || "";
+        if(startDate && !endDate){
+          d.ClaimedCoinList = d.ClaimedCoinList.filter(coin => {
+            if(coin.IsSettled == true){
+              const creationDate = moment(coin.CreationTimestamp);
+              return creationDate.isBetween(sDate, moment().format('YYYY-MM-DD'), null, '[]'); // inclusive of start and end dates
+            }
+          
+          });
+          d.TotalCoin = d.ClaimedCoinList.reduce((total, coin) => total + coin.Value, 0);
+        }
+        if(startDate && endDate){
+          d.ClaimedCoinList = d.ClaimedCoinList.filter(coin => {
+            if(coin.IsSettled == true){
+            const creationDate = moment(coin.CreationTimestamp);
+            return creationDate.isBetween(sDate, eDate, null, '[]'); // inclusive of start and end dates
+            }
+          });
+          d.TotalCoin = d.ClaimedCoinList.reduce((total, coin) => total + coin.Value, 0);
+        }
+        d.ClaimedCoinList = []
+
         finalD.push(d);
-      }
-      res.json({
-        success: true,
-        message: finalD.length + " Records Found.",
-        data: finalD,
-      });
+        }
+        res.json({
+          success: true,
+          message: finalD.length + " Records Found.",
+          data: finalD,
+        });
     }
   })
   .sort({TotalCoin: -1})
