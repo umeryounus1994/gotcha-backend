@@ -111,9 +111,26 @@ exports.listAllUser = function (req, res) {
       return res.status(400).json({ success: false, message: "Invalid end date format." });
     }
   }
-  // var selection = {
-  //   ClaimedCoinList: 0,
-  // };
+  if (startDate && endDate) {
+    const parsedStartDate = new Date(startDate);
+    const parsedEndDate = new Date(endDate);
+    
+    if (!isNaN(parsedStartDate.getTime()) && !isNaN(parsedEndDate.getTime())) {
+      // Ensure that the start date is less than the end date
+      if (parsedStartDate < parsedEndDate) {
+        // Initialize CreationTimestamp if it hasn't been yet
+        if (!query.CreationTimestamp) {
+          query.CreationTimestamp = {};
+        }
+        query.CreationTimestamp.$gte = parsedStartDate; // Greater than start date
+        query.CreationTimestamp.$lte = parsedEndDate; // Less than end date
+      } else {
+        return res.status(400).json({ success: false, message: "Start date must be less than end date." });
+      }
+    } else {
+      return res.status(400).json({ success: false, message: "Invalid date format." });
+    }
+  }
   userCoinDetails.find(query, async function (err, data) {
     if (err) {
       res.json({
@@ -142,20 +159,15 @@ exports.listAllUser = function (req, res) {
         d.ContactNumber = us.ContactNumber || "";
         if(startDate && !endDate){
           d.ClaimedCoinList = d.ClaimedCoinList.filter(coin => {
-            if(coin.IsSettled == true){
               const creationDate = moment(coin.CreationTimestamp);
               return creationDate.isBetween(sDate, moment().format('YYYY-MM-DD'), null, '[]'); // inclusive of start and end dates
-            }
-          
           });
           d.TotalCoin = d.ClaimedCoinList.reduce((total, coin) => total + coin.Value, 0);
         }
         if(startDate && endDate){
           d.ClaimedCoinList = d.ClaimedCoinList.filter(coin => {
-            if(coin.IsSettled == true){
             const creationDate = moment(coin.CreationTimestamp);
             return creationDate.isBetween(sDate, eDate, null, '[]'); // inclusive of start and end dates
-            }
           });
           d.TotalCoin = d.ClaimedCoinList.reduce((total, coin) => total + coin.Value, 0);
         }
