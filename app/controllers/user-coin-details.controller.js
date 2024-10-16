@@ -1,4 +1,5 @@
 let userCoinDetails = require("../models/user-coin-details.view");
+let offerClaimedDetails = require("../models/offer-claimed.model");
 var ObjectId = require('mongodb').ObjectID;
 const excel = require('node-excel-export');
 const usersModel = require("../models/users.model");
@@ -93,7 +94,7 @@ exports.listAllUser = function (req, res) {
   if (startDate) {
     const parsedStartDate = new Date(startDate);
     if (!isNaN(parsedStartDate.getTime())) { // Check for valid date
-      query.CreationTimestamp = { ...query.CreationTimestamp, $gte: parsedStartDate }; // Start date
+      sDate = parsedStartDate; // Start date
     } else {
       return res.status(400).json({ success: false, message: "Invalid start date format." });
     }
@@ -106,7 +107,7 @@ exports.listAllUser = function (req, res) {
       if (!query.CreationTimestamp) {
         query.CreationTimestamp = {};
       }
-      query.CreationTimestamp.$lte = parsedEndDate; // End date
+      eDate = parsedEndDate; // End date
     } else {
       return res.status(400).json({ success: false, message: "Invalid end date format." });
     }
@@ -122,8 +123,8 @@ exports.listAllUser = function (req, res) {
         if (!query.CreationTimestamp) {
           query.CreationTimestamp = {};
         }
-        query.CreationTimestamp.$gte = parsedStartDate; // Greater than start date
-        query.CreationTimestamp.$lte = parsedEndDate; // Less than end date
+        sDate = parsedStartDate; // Greater than start date
+        eDate = parsedEndDate; // Less than end date
       } else {
         return res.status(400).json({ success: false, message: "Start date must be less than end date." });
       }
@@ -131,58 +132,98 @@ exports.listAllUser = function (req, res) {
       return res.status(400).json({ success: false, message: "Invalid date format." });
     }
   }
-  userCoinDetails.find(query, async function (err, data) {
+  if(!startDate && !endDate){
+    sDate = new Date();
+    eDate = new Date();
+  }
+  if(startDate && !endDate){
+    eDate = new Date();
+  }
+  offerClaimedDetails.aggregate([
+    {
+      $match: {
+        CreationTimestamp: {
+          ...(sDate ? { $gte: sDate } : {}),
+          ...(eDate ? { $lte: eDate } : {})
+        }
+      }
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'ClaimedBy',
+        foreignField: '_id',
+        as: 'userDetails'
+      }
+    },
+    {
+      $unwind: {
+        path: '$userDetails',
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $group: {
+        _id: '$ClaimedBy',
+        TotalCoin: { $sum: '$Value' },
+        userDetails: { $first: '$userDetails' },
+        claimedCoins: { $push: '$ClaimedCoinList' },
+        CreationTimestamp: { $first: '$CreationTimestamp' },
+        PurchasePackage: { $first: '$userDetails.PurchasePackage' },
+        PackagePrice: { $first: '$userDetails.PackagePrice' },
+        PackageExpiryDate: { $first: '$userDetails.PackageExpiryDate' },
+        FullName: { $first: '$userDetails.FullName' },
+        IsActive: { $first: '$userDetails.IsActive' },
+      }
+    },
+    {
+      $project: {
+        _id: 1,
+        TotalCoin: 1,
+        PurchasePackage: 1,
+        PackagePrice: 1,
+        IsActive: 1,
+        'FullName': '$userDetails.FullName',
+        'Email': '$userDetails.Email',
+        'ContactNumber': '$userDetails.ContactNumber',
+        'AccountNumber': '$userDetails.AccountNumber',
+        'BSB': '$userDetails.BSB',
+        CreationTimestamp: 1,
+        PurchasePackageExpired: {
+          $cond: {
+            if: {
+              $and: [
+                { $ne: ['$packageExpiryDate', null] }, // Ensure the expiry date is not null
+                { $lt: ['$packageExpiryDate', new Date()] } // Check if the expiry date is less than the current date
+              ]
+            },
+            then: true,
+            else: false
+          }
+        },
+        claimedCoins: { $reduce: {
+            input: '$claimedCoins',
+            initialValue: [],
+            in: { $concatArrays: ['$$value', '$$this'] }
+          }
+        }
+      }
+    },
+  ]).exec(function(err, finalD) {
     if (err) {
-      res.json({
+      return res.json({
         success: false,
         message: "Server Error",
         data: err,
       });
-    } else {
-      let finalD = [];
-      var currDate = momenttz();
-      for (const d of data) {
-        const us = await usersModel.findOne({ _id: new ObjectId(d._id) });
-        if(us.PackageExpiryDate){
-          var cDate = momenttz(d.PackageExpiryDate);
-          if(cDate < currDate){
-            d.PurchasePackageExpired = false
-          } else {
-            d.PurchasePackageExpired = true;
-          }
-        }
-        d.PurchasePackage = us.PurchasePackage || false;
-        d.PackagePrice = us.PackagePrice || "";
-        d.AccountNumber = us.AccountNumber || "";
-        d.PackageExpiryDate = us.PackageExpiryDate || "";
-        d.BSB = us.BSB || "";
-        d.ContactNumber = us.ContactNumber || "";
-        if(startDate && !endDate){
-          d.ClaimedCoinList = d.ClaimedCoinList.filter(coin => {
-              const creationDate = moment(coin.CreationTimestamp);
-              return creationDate.isBetween(sDate, moment().format('YYYY-MM-DD'), null, '[]'); // inclusive of start and end dates
-          });
-          d.TotalCoin = d.ClaimedCoinList.reduce((total, coin) => total + coin.Value, 0);
-        }
-        if(startDate && endDate){
-          d.ClaimedCoinList = d.ClaimedCoinList.filter(coin => {
-            const creationDate = moment(coin.CreationTimestamp);
-            return creationDate.isBetween(sDate, eDate, null, '[]'); // inclusive of start and end dates
-          });
-          d.TotalCoin = d.ClaimedCoinList.reduce((total, coin) => total + coin.Value, 0);
-        }
-        d.ClaimedCoinList = []
-
-        finalD.push(d);
-        }
-        res.json({
-          success: true,
-          message: finalD.length + " Records Found.",
-          data: finalD,
-        });
     }
-  })
-  .sort({TotalCoin: -1})
+    
+    res.json({
+      success: true,
+      message: finalD.length + " Records Found.",
+      data: finalD,
+    });
+  });
 };
 
 // You can define styles as json object
