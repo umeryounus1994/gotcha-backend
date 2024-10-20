@@ -120,7 +120,7 @@ exports.listAllUser = function (req, res) {
     
     if (!isNaN(parsedStartDate.getTime()) && !isNaN(parsedEndDate.getTime())) {
       // Ensure that the start date is less than the end date
-      if (parsedStartDate < parsedEndDate) {
+      if (parsedStartDate <= parsedEndDate) {
         // Initialize CreationTimestamp if it hasn't been yet
         if (!query.CreationTimestamp) {
           query.CreationTimestamp = {};
