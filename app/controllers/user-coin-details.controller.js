@@ -5,6 +5,8 @@ const excel = require('node-excel-export');
 const usersModel = require("../models/users.model");
 const { ObjectID } = require("mongoose/lib/schema/index");
 var moment = require('moment');
+const mongoose = require('mongoose');
+const schema = mongoose.Schema;
 const momenttz = require('moment-timezone');
 momenttz.tz.setDefault('Australia/Brisbane');
 exports.list = function (req, res) {
@@ -139,72 +141,107 @@ exports.listAllUser = function (req, res) {
   if(startDate && !endDate){
     eDate = new Date();
   }
-  offerClaimedDetails.aggregate([
+  
+
+  const userDetailsAggregation = usersModel.aggregate([
     {
+      // Match users based on CreationTimestamp
       $match: {
+        IsDeleted: false,
         CreationTimestamp: {
-          ...(sDate ? { $gte: sDate } : {}),
-          ...(eDate ? { $lte: eDate } : {})
+          $gte: new Date(sDate),
+          $lte: new Date(eDate)
         }
       }
     },
     {
+      // Lookup to get claimed offers
       $lookup: {
-        from: 'users',
-        localField: 'ClaimedBy',
-        foreignField: '_id',
-        as: 'userDetails'
+        from: 'offersclaimeds',
+        localField: '_id',
+        foreignField: 'ClaimedBy',
+        as: 'claimedOffers'
       }
     },
     {
+      // Unwind the claimedOffers array, preserving users without claims
       $unwind: {
-        path: '$userDetails',
+        path: '$claimedOffers',
         preserveNullAndEmptyArrays: true
       }
     },
     {
+      // Match to filter claimed offers based on their CreationTimestamp
+      $match: {
+        $or: [
+          {
+            'claimedOffers.CreationTimestamp': {
+              $gte: new Date(sDate),
+              $lte: new Date(eDate)
+            }
+          },
+          { 'claimedOffers': { $exists: false } }
+        ]
+      }
+  
+    },
+    {
+      // Group by user ID and sum the coins
       $group: {
-        _id: '$ClaimedBy',
-        TotalCoin: { $sum: '$Value' },
-        userDetails: { $first: '$userDetails' },
-        claimedCoins: { $push: '$ClaimedCoinList' },
+        _id: '$_id',
+        FullName: { $first: '$FullName' },
+        Email: { $first: '$Email' },
+        ContactNumber: { $first: '$ContactNumber' },
+        AccountNumber: { $first: '$AccountNumber' },
+        BSB: { $first: '$BSB' },
+        TotalCoin: {
+          $sum: {
+            $cond: {
+              if: {
+                $and: [
+                  { $gte: ['$claimedOffers.CreationTimestamp', new Date(sDate)] },
+                  { $lte: ['$claimedOffers.CreationTimestamp', new Date(eDate)] }
+                ]
+              },
+              then: { $ifNull: ['$claimedOffers.Value', 0] },
+              else: 0
+            }
+          }
+        },
+        PurchasePackage: { $first: '$PurchasePackage' },
+        PackagePrice: { $first: '$PackagePrice' },
+        PackageExpiryDate: { $first: '$PackageExpiryDate' },
+        IsActive: { $first: '$IsActive' },
+        claimedCoins: { $push: '$claimedOffers.ClaimedCoinList' },
         CreationTimestamp: { $first: '$CreationTimestamp' },
-        PurchasePackage: { $first: '$userDetails.PurchasePackage' },
-        PackagePrice: { $first: '$userDetails.PackagePrice' },
-        PackageExpiryDate: { $first: '$userDetails.PackageExpiryDate' },
-        FullName: { $first: '$userDetails.FullName' },
-        IsActive: { $first: '$userDetails.IsActive' },
+        claimedOffers: { $push: '$claimedOffers' } 
       }
     },
     {
+      // Final projection
       $project: {
         _id: 1,
+        FullName: 1,
+        Email: 1,
+        ContactNumber: 1,
+        AccountNumber: 1,
+        BSB: 1,
         TotalCoin: 1,
         PurchasePackage: 1,
         PackagePrice: 1,
-        IsActive: 1,
-        'FullName': '$userDetails.FullName',
-        'Email': '$userDetails.Email',
-        'ContactNumber': '$userDetails.ContactNumber',
-        'AccountNumber': '$userDetails.AccountNumber',
-        'BSB': '$userDetails.BSB',
+        PackageExpiryDate: 1,
         CreationTimestamp: 1,
+        IsActive: 1,
         PurchasePackageExpired: {
           $cond: {
             if: {
               $and: [
-                { $ne: ['$packageExpiryDate', null] }, // Ensure the expiry date is not null
-                { $lt: ['$packageExpiryDate', new Date()] } // Check if the expiry date is less than the current date
+                { $ne: ['$PackageExpiryDate', null] },
+                { $lt: ['$PackageExpiryDate', new Date()] }
               ]
             },
             then: true,
             else: false
-          }
-        },
-        claimedCoins: { $reduce: {
-            input: '$claimedCoins',
-            initialValue: [],
-            in: { $concatArrays: ['$$value', '$$this'] }
           }
         }
       }
@@ -217,13 +254,17 @@ exports.listAllUser = function (req, res) {
         data: err,
       });
     }
-    
+  
     res.json({
       success: true,
       message: finalD.length + " Records Found.",
       data: finalD,
     });
   });
+  
+  
+  
+  
 };
 
 // You can define styles as json object
