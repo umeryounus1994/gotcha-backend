@@ -145,9 +145,8 @@ exports.listAllUser = function (req, res) {
   }
   if(startDate && !endDate){
     const givenDate = new Date();
-    const eeDate = new Date(givenDate.getFullYear(), givenDate.getMonth(), givenDate.getDate(), 23, 59, 0);
-    eDate = eeDate.toISOString()
-    eDate.setHours(23, 59, 0, 0);
+    const esDate = new Date(givenDate.getFullYear(), givenDate.getMonth(), givenDate.getDate(), 23, 59, 0);
+    eDate = esDate.toISOString()
   }
   const userDetailsAggregation = usersModel.aggregate([
     {
