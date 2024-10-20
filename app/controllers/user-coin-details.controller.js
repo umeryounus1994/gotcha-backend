@@ -148,10 +148,10 @@ exports.listAllUser = function (req, res) {
       // Match users based on CreationTimestamp
       $match: {
         IsDeleted: false,
-        CreationTimestamp: {
-          $gte: new Date(sDate),
-          $lte: new Date(eDate)
-        }
+        // CreationTimestamp: {
+        //   $gte: new Date(sDate),
+        //   $lte: new Date(eDate)
+        // }
       }
     },
     {
