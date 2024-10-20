@@ -110,6 +110,7 @@ exports.listAllUser = function (req, res) {
         query.CreationTimestamp = {};
       }
       eDate = parsedEndDate; // End date
+      eDate.setHours(23, 59, 0, 0);
     } else {
       return res.status(400).json({ success: false, message: "Invalid end date format." });
     }
@@ -127,6 +128,7 @@ exports.listAllUser = function (req, res) {
         }
         sDate = parsedStartDate; // Greater than start date
         eDate = parsedEndDate; // Less than end date
+        eDate.setHours(23, 59, 0, 0);
       } else {
         return res.status(400).json({ success: false, message: "Start date must be less than end date." });
       }
@@ -135,14 +137,18 @@ exports.listAllUser = function (req, res) {
     }
   }
   if(!startDate && !endDate){
-    sDate = new Date();
-    eDate = new Date();
+    const givenDate = new Date();
+    const ssDate = new Date(givenDate.getFullYear(), givenDate.getMonth(), givenDate.getDate(), 0, 0, 0);
+    const eeDate = new Date(givenDate.getFullYear(), givenDate.getMonth(), givenDate.getDate(), 23, 59, 0);
+    sDate = ssDate.toISOString();
+    eDate = eeDate.toISOString()
   }
   if(startDate && !endDate){
-    eDate = new Date();
+    const givenDate = new Date();
+    const eeDate = new Date(givenDate.getFullYear(), givenDate.getMonth(), givenDate.getDate(), 23, 59, 0);
+    eDate = eeDate.toISOString()
+    eDate.setHours(23, 59, 0, 0);
   }
-  
-
   const userDetailsAggregation = usersModel.aggregate([
     {
       // Match users based on CreationTimestamp
