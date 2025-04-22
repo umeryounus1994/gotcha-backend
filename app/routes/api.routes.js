@@ -66,7 +66,6 @@ mediaUpload.fields([
 function (req, res) {
   
   var offerForm = req.body;
-  console.log(offerForm)
 
   var Icon = null;
 
@@ -257,7 +256,6 @@ authRoutes.post('/markerTypes',
   function (req, res) {
 
     var markerTypeForm = req.body;
-    console.log(markerTypeForm)
 
     if (req.files && req.files.Picture) {
       markerTypeForm.Picture = req.files.Picture[0].location;
@@ -265,7 +263,6 @@ authRoutes.post('/markerTypes',
 
     markerTypesController.addMarkerType(markerTypeForm, function (err, result) {
       if (err) {
-        console.log(err);
         return res.json({
           message: "Error in Connecting to DB",
           success: false
@@ -445,7 +442,6 @@ async function (req, res) {
 
           user.save(function (err) {
             if (err) {
-              console.log("err 2", err)
               res.json({
                 success: false,
                 message: "Server Error",
@@ -535,7 +531,6 @@ async function (req, res) {
 
           user.save(function (err) {
             if (err) {
-              console.log("err 2", err)
               res.json({
                 success: false,
                 message: "Server Error",
@@ -582,7 +577,6 @@ authRoutes.post('/users/sendNotification', function (req, res) {
   usersController.getAllNotificationUser(function (err, result) {
     if(err)
     {
-        console.log(err)
     }
     else
     {
@@ -644,6 +638,9 @@ router.route("/danger/walletClear67").get(usersController.deleteWallet);
 authRoutes.route("/users/purchase-package").post(usersController.purchasePackage);
 
 //module.exports = router;
+
+
+router.route("/offers/hold-offer").post(offersController.holdOffer);
 
 module.exports = {
   apiRoutes: router,

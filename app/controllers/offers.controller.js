@@ -1,4 +1,5 @@
 let Offers = require('../models/offers.model');
+let OffersHeld = require('../models/offer-held.model');
 let OffersClaimedModel = require('../models/offer-claimed.model');
 
 const uploadIcon = require('../utilities/uploaders/map-icon.uploader');
@@ -259,18 +260,69 @@ exports.claimed = function (req, res) {
     });
 };
 
-exports.claim = async function (req, res) {
+exports.holdOffer = async function (req, res) {
   var OfferId = req.body.OfferId;
   var UserId = req.body.UserId;
-  let selection;
-  let updatedData;
 
   let offerData = await Offers.findById(OfferId);
-  let userExist = false;
-  let userExistData;
-  let userExistIndex;
+  let heldOffer = await OffersHeld.find({OfferId: OfferId, Status: 'claimed'});
+    if(heldOffer && heldOffer.length < 1){
+      if(offerData){
+        var location = { type: 'Point', coordinates: [req.body.lng, req.body.lat] };
+        let reqData = {
+          HeldBy: UserId,
+          OfferId: offerData._id,
+          Location: location,
+          Status: 'pending'
+        }
+        await OffersHeld.create(reqData);
+      
+        res.json({
+          success: true,
+          message: 'Offer Successfully Held!',
+          data: null,
+        });
+    }
+
+    } else {
+      res.json({
+        success: false,
+        message: 'Offer already Claimed',
+        data: null,
+      });
+    }
+  
+
+};
+
+
+exports.claim = async function (req, res) {
+  var OfferId = req.body.OfferId;
+
+  let lastHeldOffer = await OffersHeld.findOne({ OfferId: OfferId })
+                                    .sort({ CreationTimestamp: -1 }); // or use a timestamp field if available
+  
+  let ClaimedOffer = await OffersHeld.findOne({ OfferId: OfferId, Status: "claimed" });
+  if(ClaimedOffer){
+    res.json({
+      success: false,
+      message: 'Offer already claimed',
+      data: null,
+    });
+  }
+
+  if(!lastHeldOffer){
+    res.json({
+      success: false,
+      message: 'Offer not found',
+      data: null,
+    });
+  }
+  var UserId = lastHeldOffer?.UserId;
+
+  let offerData = await Offers.findById(OfferId);
+
   let a = moment(new Date()); 
-  let reAvailabilityTime;
   if(offerData.ReAppear){
     reAvailabilityTime = a.clone().add(offerData.ReAppearTime, 'hours'); 
   } else {
@@ -287,15 +339,6 @@ exports.claim = async function (req, res) {
 
   offerData.IsActive = false;
   
-  // if(userExist){
-  //   selection = { _id: OfferId, 'ClaimedBy._id': userExistData._id };
-  //   updatedData = { $set: { 'ClaimedBy.$.UserId': UserId, 'ClaimedBy.$.CreationTimestamp': new Date(), 'ClaimedBy.$.AvailabilityTimestamp': reAvailabilityTime } };
-  // } else {
-  //   selection = { _id: OfferId };
-  //   updatedData = { $push: { 'ClaimedBy.UserId': UserId, 'ClaimedBy.CreationTimestamp': new Date(), 'ClaimedBy.AvailabilityTimestamp': reAvailabilityTime } };
-  // }
-
-  // Offers.updateOne(selection, updatedData, async function callback(errr, doc) {
     offerData.save(async function (err) {
     if (err) {
       res.json({
@@ -307,7 +350,7 @@ exports.claim = async function (req, res) {
       // console.log("update offer doc ",doc)
       let reqData = {
         ClaimedBy: UserId,
-        OfferId: offerData._id,
+        OfferId: OfferId,
         Type: offerData.Type,
         OfferedBy: offerData.OfferedBy,
         Type: offerData.Type,
@@ -319,9 +362,6 @@ exports.claim = async function (req, res) {
         Icon: offerData.Icon,
         Status: 'requested'
       }
-      // if(parseInt(offerData.Value) < 1){
-      //   reqData.Status = 'requested';
-      // } 
       const OffersClaimedDoc = await OffersClaimedModel.create(reqData);
 
       res.json({
