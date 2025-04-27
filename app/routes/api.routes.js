@@ -641,6 +641,7 @@ authRoutes.route("/users/purchase-package").post(usersController.purchasePackage
 
 
 router.route("/offers/hold-offer").post(offersController.holdOffer);
+router.route("/offers/remaining-offer-time").post(offersController.remainingOfferTime);
 
 module.exports = {
   apiRoutes: router,

@@ -260,40 +260,108 @@ exports.claimed = function (req, res) {
     });
 };
 
+
+
 exports.holdOffer = async function (req, res) {
   var OfferId = req.body.OfferId;
   var UserId = req.body.UserId;
 
-  let offerData = await Offers.findById(OfferId);
-  let heldOffer = await OffersHeld.find({OfferId: OfferId, Status: 'claimed'});
-    if(heldOffer && heldOffer.length < 1){
-      if(offerData){
-        var location = { type: 'Point', coordinates: [req.body.lng, req.body.lat] };
-        let reqData = {
-          HeldBy: UserId,
-          OfferId: offerData._id,
-          Location: location,
-          Status: 'pending'
-        }
-        await OffersHeld.create(reqData);
-      
-        res.json({
-          success: true,
-          message: 'Offer Successfully Held!',
-          data: null,
-        });
-    }
+  let heldOfferUser = await OffersHeld.findOne({ OfferId: OfferId, UserId: UserId, Status: 'pending' });
+  if(heldOfferUser){
+    res.json({
+      success: false,
+      message: 'You have already placed this offer before',
+      data: null,
+    });
+  }
 
-    } else {
+  // Find the first held offer for the given OfferId
+  let heldOffer = await OffersHeld.findOne({ OfferId: OfferId, Status: 'pending' }).sort({ CreationTimestamp: 1 });
+
+  // If there is an existing pending offer, check if 24 hours have passed
+  if (heldOffer) {
+    let timeDiff = moment().diff(moment(heldOffer.CreationTimestamp), 'hours'); // Time difference in hours
+
+    if (timeDiff >= 24) {
+      // If 24 hours have passed, update the status to 'claimed'
+      heldOffer.Status = 'claimed';
+      await heldOffer.save(); // Save the updated status
       res.json({
         success: false,
-        message: 'Offer already Claimed',
+        message: 'Offer was automatically claimed after 24 hours.',
         data: null,
       });
+      return; // Exit the function since the offer was claimed
     }
-  
+  }
 
+  // If no pending offer or 24 hours haven't passed, continue with holding the offer
+  let offerData = await Offers.findById(OfferId);
+  if (!offerData) {
+    return res.json({
+      success: false,
+      message: 'Offer not found.',
+      data: null,
+    });
+  }
+
+  // Check if the offer has already been claimed by someone else
+  let existingClaim = await OffersHeld.find({ OfferId: OfferId, Status: 'claimed' });
+  if (existingClaim && existingClaim.length > 0) {
+    return res.json({
+      success: false,
+      message: 'Offer already claimed.',
+      data: null,
+    });
+  }
+
+  // Otherwise, create a new held offer
+  var location = { type: 'Point', coordinates: [req.body.lng, req.body.lat] };
+  let reqData = {
+    HeldBy: UserId,
+    OfferId: offerData._id,
+    Location: location,
+    Status: 'pending', // Set the status as pending initially
+    CreationTimestamp: Date.now(), // Store when the offer was held
+  };
+
+  // Create the held offer entry
+  await OffersHeld.create(reqData);
+
+  // Send success response
+  res.json({
+    success: true,
+    message: 'Offer successfully held!',
+    data: null,
+  });
 };
+
+exports.remainingOfferTime = async function (req, res) {
+  var OfferId = req.body.OfferId;
+
+   // Check if the offer has already been claimed by someone else
+   let existingClaim = await OffersHeld.find({ OfferId: OfferId, Status: 'claimed' });
+   if (existingClaim && existingClaim.length > 0) {
+     return res.json({
+       success: false,
+       message: 'Offer already claimed.',
+       data: null,
+     });
+   }
+
+  // Find the first held offer for the given OfferId
+  let heldOffer = await OffersHeld.findOne({ OfferId: OfferId, Status: 'pending' }).sort({ CreationTimestamp: 1 });
+  if (heldOffer) {
+    let timeDiff = moment().diff(moment(heldOffer.CreationTimestamp), 'hours'); // Time difference in hours
+    res.json({
+      success: true,
+      message: 'Timer Data',
+      data: timeDiff,
+    });
+  }
+  
+};
+
 
 
 exports.claim = async function (req, res) {
