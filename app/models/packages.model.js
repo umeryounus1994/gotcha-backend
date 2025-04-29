@@ -6,13 +6,16 @@ const packagesSchema = new schema({
     type: String,
     required: true,
   },
-  AllowedDrops: {
+  Price: {
     type: Number,
     required: true,
   },
-  Cost: {
+  Coins: {
     type: Number,
     required: true,
+  },
+  FreeCoins: {
+    type: Number
   },
   IsActive: {
     type: Boolean,

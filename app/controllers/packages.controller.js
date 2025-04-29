@@ -3,13 +3,15 @@ let Packages = require('../models/packages.model');
 // Add:
 exports.add = function (req, res) {
   var Name = req.body.Name;
-  var Cost = req.body.Cost;
-  var AllowedDrops = req.body.AllowedDrops;
+  var Price = req.body.Price;
+  var Coins = req.body.Coins;
+  var FreeCoins = req.body.FreeCoins;
 
   var package = new Packages();
   package.Name = Name;
-  package.Cost = Cost;
-  package.AllowedDrops = AllowedDrops;
+  package.Price = Price;
+  package.Coins = Coins;
+  package.FreeCoins = FreeCoins;
 
   package.save(function (err) {
     if (err) {
@@ -51,14 +53,16 @@ exports.update = function (req, res) {
   var Id = req.body.Id;
   var IsActive = req.body.IsActive;
   var Name = req.body.Name;
-  var Cost = req.body.Cost;
-  var AllowedDrops = req.body.AllowedDrops;
+  var FreeCoins = req.body.FreeCoins;
+  var Price = req.body.Price;
+  var Coins = req.body.Coins;
   var selection = { _id: Id };
   var updatedData = {
     IsActive: IsActive,
     Name: Name,
-    Cost: Cost,
-    AllowedDrops: AllowedDrops,
+    Coins: Coins,
+    Price: Price,
+    FreeCoins: FreeCoins,
   };
   Packages.update(selection, updatedData, function callback(errr, doc) {
     if (errr) {
@@ -78,7 +82,7 @@ exports.update = function (req, res) {
 };
 
 exports.delete = function (req, res) {
-  var Id = req.body.Id;
+  var Id = req.params.Id;
   var selection = { _id: Id };
   Packages.remove(selection, function callback(err, doc) {
     if (err) {
