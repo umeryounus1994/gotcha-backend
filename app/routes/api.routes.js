@@ -618,7 +618,7 @@ authRoutes.route("/users/export-excel").get(userCoinDetailsController.exportExce
 
 
 // Packages:
-authRoutes.route("/packages").get(packagesController.list);
+router.route("/packages").get(packagesController.list);
 authRoutes.route("/packages/add").post(packagesController.add);
 authRoutes.route("/packages/update").post(packagesController.update);
 authRoutes.route("/packages/delete/:Id").post(packagesController.delete);
