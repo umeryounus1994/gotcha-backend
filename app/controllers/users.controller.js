@@ -1,4 +1,5 @@
 let Users = require("../models/users.model");
+let UserCoins = require("../models/user-coins.model");
 let Offers = require("../models/offers.model");
 let OffersClaimedModel = require('../models/offer-claimed.model');
 
@@ -28,9 +29,10 @@ exports.login = function (req, res) {
       if (user) {
         var userPassword = user.Password;
 
-        bcrypt.compare(Password, userPassword, function (err, matched) {
+        bcrypt.compare(Password, userPassword, async function (err, matched) {
           if (matched) {
             if (user.IsActive) {
+              var usercoins = await UserCoins.findOne({ UserId: user._id });
               var currDate = momenttz();
               var PurchasePackageExpired = false;
               if(user.PackageExpiryDate && user.PackageExpiryDate != ""){
@@ -54,7 +56,8 @@ exports.login = function (req, res) {
                 // Gender: user.Gender,
                 ProfilePicture: user?.ProfilePicture,
                 PurchasePackage: user?.PurchasePackage,
-                PurchasePackageExpired: PurchasePackageExpired
+                PurchasePackageExpired: PurchasePackageExpired,
+                HeldCoins: usercoins?.HeldCoins || 0
               };
 
               let token = jwt.sign(userData, Constants.JWT.secret, {
@@ -192,6 +195,96 @@ module.exports.getAllNotificationUser = (callback) => {
 	Users.find({Token: {$ne: ""}, IsDeleted: false, IsActive: true},callback);
 }
 
+module.exports.saveWatchadCoins = function (req, res) {
+  const { UserId, action } = req.body;
+  const COIN_VALUE = 200000; // Fixed value for each watched ad
+
+  if (!UserId || !action) {
+    return res.status(400).json({
+      success: false,
+      message: "UserId and action are required",
+      data: null
+    });
+  }
+
+  // Find existing user
+  UserCoins.findOne({ UserId: UserId }, function (err, userData) {
+    if (err) {
+      return res.json({
+        success: false,
+        message: "Server Error",
+        data: err
+      });
+    }
+
+    if (!userData) {
+      return res.json({
+        success: false,
+        message: "User not found",
+        data: null
+      });
+    }
+
+    if (action === 'add') {
+      // Add coins for watching ad
+      userData.HeldCoins = (userData.HeldCoins || 0) + COIN_VALUE;
+      
+      userData.save(function (err, updatedUser) {
+        if (err) {
+          return res.json({
+            success: false,
+            message: "Error saving coins",
+            data: err
+          });
+        }
+
+        res.json({
+          success: true,
+          message: "Coins added successfully",
+          data: {
+            HeldCoins: updatedUser.HeldCoins
+          }
+        });
+      });
+    } else if (action === 'deduct') {
+      // Check if user has enough coins
+      if ((userData.HeldCoins || 0) < COIN_VALUE) {
+        return res.json({
+          success: false,
+          message: "Insufficient coins",
+          data: null
+        });
+      }
+
+      // Deduct coins
+      userData.HeldCoins = (userData.HeldCoins || 0) - COIN_VALUE;
+      
+      userData.save(function (err, updatedUser) {
+        if (err) {
+          return res.json({
+            success: false,
+            message: "Error deducting coins",
+            data: err
+          });
+        }
+
+        res.json({
+          success: true,
+          message: "Coins deducted successfully",
+          data: {
+            HeldCoins: updatedUser.HeldCoins
+          }
+        });
+      });
+    } else {
+      res.json({
+        success: false,
+        message: "Invalid action. Use 'add' or 'deduct'",
+        data: null
+      });
+    }
+  });
+};
 
 exports.updateProfile = function (req, res) {
 
