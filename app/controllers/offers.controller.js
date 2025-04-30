@@ -358,6 +358,12 @@ exports.remainingOfferTime = async function (req, res) {
       message: 'Timer Data',
       data: timeDiff,
     });
+  } else {
+    res.json({
+      success: true,
+      message: 'Timer Data',
+      data: 24,
+    });
   }
   
 };
