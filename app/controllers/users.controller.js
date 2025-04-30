@@ -1039,3 +1039,14 @@ exports.purchasePackage = function (req, res) {
 
  
 };
+
+exports.remainingCoins = async function (req, res) {
+  var UserId = req.body.UserId;
+  var usercoins = await UserCoins.findOne({ UserId: UserId });
+  res.json({
+    success: true,
+    message: 'Coins',
+    data: usercoins?.HeldCoins || 0,
+  });
+  
+};
