@@ -314,34 +314,55 @@ exports.holdOffer = async function (req, res) {
       data: null,
     });
   }
-
+  const { lng, lat } = req.body;
+  if (!lng || !lat) {
+    return res.status(400).json({
+      success: false,
+      message: "Latitude and Longitude are required",
+      data: null
+    });
+  }
   // Otherwise, create a new held offer
   var location = { type: 'Point', coordinates: [req.body.lng, req.body.lat] };
-  let reqData = {
-    HeldBy: UserId,
-    OfferId: offerData._id,
-    Location: location,
-    Status: 'pending', // Set the status as pending initially
-    CreationTimestamp: Date.now(), // Store when the offer was held
-  };
+  if(!heldOffer){
+    let reqData = {
+      HeldBy: UserId,
+      OfferId: offerData._id,
+      Location: location,
+      Status: 'pending', // Set the status as pending initially
+      CreationTimestamp: Date.now(), // Store when the offer was held
+    };
+  
+    // Create the held offer entry
+    await OffersHeld.create(reqData);
+  
+    // Send success response
+    res.json({
+      success: true,
+      message: 'Offer successfully held!',
+      data: null,
+    });
+  } else {
+    heldOffer.UserId = UserId;
+    heldOffer.Location = location;
+    heldOffer.CreationTimestamp = Date.now();
+    heldOffer.save();
+    res.json({
+      success: true,
+      message: 'Offer successfully held!',
+      data: null,
+    });
+  }
 
-  // Create the held offer entry
-  await OffersHeld.create(reqData);
 
-  // Send success response
-  res.json({
-    success: true,
-    message: 'Offer successfully held!',
-    data: null,
-  });
 };
 
 exports.remainingOfferTime = async function (req, res) {
   var OfferId = req.body.OfferId;
 
    // Check if the offer has already been claimed by someone else
-   let existingClaim = await OffersHeld.find({ OfferId: OfferId, Status: 'claimed' });
-   if (existingClaim && existingClaim.length > 0) {
+   let existingClaim = await OffersHeld.findOne({ OfferId: OfferId, Status: 'claimed' });
+   if (existingClaim) {
      return res.json({
        success: false,
        message: 'Offer already claimed.',
@@ -388,7 +409,7 @@ exports.claim = async function (req, res) {
   if(!lastHeldOffer){
     res.json({
       success: false,
-      message: 'Offer not found',
+      message: 'This offer is not held by any user',
       data: null,
     });
   }
@@ -437,6 +458,8 @@ exports.claim = async function (req, res) {
         Status: 'requested'
       }
       const OffersClaimedDoc = await OffersClaimedModel.create(reqData);
+      lastHeldOffer.Status = "claimed";
+      lastHeldOffer.save();
 
       res.json({
         success: true,
