@@ -643,7 +643,7 @@ authRoutes.route("/users/purchase-package").post(usersController.purchasePackage
 router.route("/offers/hold-offer").post(offersController.holdOffer);
 router.route("/offers/remaining-offer-time").post(offersController.remainingOfferTime);
 
-router.route("/users/watchAddTeleport").get(usersController.saveWatchadCoins);
+router.route("/users/watchAddTeleport").post(usersController.saveWatchadCoins);
 router.route("/users/remaining-coins").post(usersController.remainingCoins);
 
 module.exports = {
