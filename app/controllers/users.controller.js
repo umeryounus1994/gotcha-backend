@@ -1061,7 +1061,6 @@ exports.remainingCoins = async function (req, res) {
 
 exports.getCoins = async function (req, res) {
   var Email = req.body.Email;
-  const COIN_VALUE = 200000;
 
   if(!Email) {
     return res.json({
