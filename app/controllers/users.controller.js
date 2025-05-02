@@ -1097,17 +1097,26 @@ exports.getCoins = async function (req, res) {
   if(!findUserCoins){
     var userCoints = new UserCoins();
     userCoints.UserId = UserId;
-    userCoints.HeldCoins = COIN_VALUE;
+    if(packageData?.FreeCoins > 0){
+      userCoints.HeldCoins = packageData?.Coins + packageData?.FreeCoins;
+    } else {
+      userCoints.HeldCoins = packageData?.Coins;
+    }
+    
     userCoints.save();
     res.json({
       success: true,
       message: "Coins added successfully",
       data: {
-        HeldCoins: COIN_VALUE
+        HeldCoins: userCoints.HeldCoins
       }
     });
   } else {
-    findUserCoins.HeldCoins = COIN_VALUE;
+    if(packageData?.FreeCoins > 0){
+      findUserCoins.HeldCoins = packageData?.Coins + packageData?.FreeCoins;
+    } else {
+      findUserCoins.HeldCoins = packageData?.Coins;
+    }
     findUserCoins.save();
     res.json({
       success: true,

@@ -637,7 +637,7 @@ router.route("/danger/walletClear67").get(usersController.deleteWallet);
 //@Umer Package purchase
 authRoutes.route("/users/purchase-package").post(usersController.purchasePackage);
 
-router.route("/users/get-coings").post(usersController.getCoins);
+router.route("/users/get-coins").post(usersController.getCoins);
 
 //module.exports = router;
 
