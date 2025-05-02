@@ -2,6 +2,7 @@ let Users = require("../models/users.model");
 let UserCoins = require("../models/user-coins.model");
 let Offers = require("../models/offers.model");
 let OffersClaimedModel = require('../models/offer-claimed.model');
+const PackagesModel = require("../models/packages.model");
 
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
@@ -16,6 +17,7 @@ let Constants = require("../app.constants");
 let EmailAccount = require("../utilities/account");
 const moment = require('moment')
 const momenttz = require('moment-timezone');
+
 momenttz.tz.setDefault('Australia/Brisbane');
 
 // Login:
@@ -218,10 +220,16 @@ module.exports.saveWatchadCoins = function (req, res) {
     }
 
     if (!userData) {
-      return res.json({
-        success: false,
-        message: "User not found",
-        data: null
+      var userCoints = new UserCoins();
+      userCoints.UserId = UserId;
+      userCoints.HeldCoins = COIN_VALUE;
+      userCoints.save();
+      res.json({
+        success: true,
+        message: "Coins added successfully",
+        data: {
+          HeldCoins: COIN_VALUE
+        }
       });
     }
 
@@ -1049,4 +1057,64 @@ exports.remainingCoins = async function (req, res) {
     data: usercoins?.HeldCoins || 0,
   });
   
+};
+
+exports.getCoins = async function (req, res) {
+  var Email = req.body.Email;
+  const COIN_VALUE = 200000;
+
+  if(!Email) {
+    return res.json({
+      success: false,
+      message: "Email is required",
+      data: null,
+    });
+  }
+  if(!req.body.PackagePrice) {
+   return  res.json({
+      success: false,
+      message: "Package Price is required",
+      data: null,
+    });
+  }
+  var packageData = await PackagesModel.findOne({Price: req.body.PackagePrice});
+  if(!packageData){
+    return  res.json({
+      success: false,
+      message: "Package not found",
+      data: null,
+    });
+  }
+  var userData = await Users.findOne({Email: req.body.Email});
+  if(!userData){
+    return  res.json({
+      success: false,
+      message: "User with email not found",
+      data: null,
+    });
+  }
+  var findUserCoins = await UserCoins.findOne({ UserId: userData?._id });
+  if(!findUserCoins){
+    var userCoints = new UserCoins();
+    userCoints.UserId = UserId;
+    userCoints.HeldCoins = COIN_VALUE;
+    userCoints.save();
+    res.json({
+      success: true,
+      message: "Coins added successfully",
+      data: {
+        HeldCoins: COIN_VALUE
+      }
+    });
+  } else {
+    findUserCoins.HeldCoins = COIN_VALUE;
+    findUserCoins.save();
+    res.json({
+      success: true,
+      message: "Coins added successfully",
+      data: {
+        HeldCoins: findUserCoins.HeldCoins
+      }
+    });
+  }
 };
