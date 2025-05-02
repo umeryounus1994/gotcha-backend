@@ -1095,7 +1095,7 @@ exports.getCoins = async function (req, res) {
   var findUserCoins = await UserCoins.findOne({ UserId: userData?._id });
   if(!findUserCoins){
     var userCoints = new UserCoins();
-    userCoints.UserId = UserId;
+    userCoints.UserId = userData?._id;
     if(packageData?.FreeCoins > 0){
       userCoints.HeldCoins = packageData?.Coins + packageData?.FreeCoins;
     } else {
