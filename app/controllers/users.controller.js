@@ -197,7 +197,7 @@ module.exports.getAllNotificationUser = (callback) => {
 	Users.find({Token: {$ne: ""}, IsDeleted: false, IsActive: true},callback);
 }
 
-module.exports.saveWatchadCoins = function (req, res) {
+module.exports.saveWatchadCoins = async function (req, res) {
   const { UserId, action } = req.body;
   const COIN_VALUE = 200000; // Fixed value for each watched ad
 
@@ -208,18 +208,8 @@ module.exports.saveWatchadCoins = function (req, res) {
       data: null
     });
   }
-
-  // Find existing user
-  UserCoins.findOne({ UserId: UserId }, function (err, userData) {
-    if (err) {
-      return res.json({
-        success: false,
-        message: "Server Error",
-        data: err
-      });
-    }
-
-    if (!userData) {
+  var userData = await UserCoins.findOne({UserId: UserId});
+  if(userData == null){
       var userCoints = new UserCoins();
       userCoints.UserId = UserId;
       userCoints.HeldCoins = COIN_VALUE;
@@ -231,67 +221,66 @@ module.exports.saveWatchadCoins = function (req, res) {
           HeldCoins: COIN_VALUE
         }
       });
-    }
-
-    if (action === 'add') {
-      // Add coins for watching ad
-      userData.HeldCoins = (userData.HeldCoins || 0) + COIN_VALUE;
-      
-      userData.save(function (err, updatedUser) {
-        if (err) {
-          return res.json({
-            success: false,
-            message: "Error saving coins",
-            data: err
-          });
-        }
-
-        res.json({
-          success: true,
-          message: "Coins added successfully",
-          data: {
-            HeldCoins: updatedUser.HeldCoins
-          }
-        });
-      });
-    } else if (action === 'deduct') {
-      // Check if user has enough coins
-      if ((userData.HeldCoins || 0) < COIN_VALUE) {
+  }
+  if (action === 'add') {
+    // Add coins for watching ad
+    userData.HeldCoins = (userData.HeldCoins || 0) + COIN_VALUE;
+    
+    userData.save(function (err, updatedUser) {
+      if (err) {
         return res.json({
           success: false,
-          message: "Insufficient coins",
-          data: null
+          message: "Error saving coins",
+          data: err
         });
       }
 
-      // Deduct coins
-      userData.HeldCoins = (userData.HeldCoins || 0) - COIN_VALUE;
-      
-      userData.save(function (err, updatedUser) {
-        if (err) {
-          return res.json({
-            success: false,
-            message: "Error deducting coins",
-            data: err
-          });
-        }
-
-        res.json({
-          success: true,
-          message: "Coins deducted successfully",
-          data: {
-            HeldCoins: updatedUser.HeldCoins
-          }
-        });
-      });
-    } else {
       res.json({
+        success: true,
+        message: "Coins added successfully",
+        data: {
+          HeldCoins: updatedUser.HeldCoins
+        }
+      });
+    });
+  } else if (action === 'deduct') {
+    // Check if user has enough coins
+    if ((userData.HeldCoins || 0) < COIN_VALUE) {
+      return res.json({
         success: false,
-        message: "Invalid action. Use 'add' or 'deduct'",
+        message: "Insufficient coins",
         data: null
       });
     }
-  });
+
+    // Deduct coins
+    userData.HeldCoins = (userData.HeldCoins || 0) - COIN_VALUE;
+    
+    userData.save(function (err, updatedUser) {
+      if (err) {
+        return res.json({
+          success: false,
+          message: "Error deducting coins",
+          data: err
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Coins deducted successfully",
+        data: {
+          HeldCoins: updatedUser.HeldCoins
+        }
+      });
+    });
+  } else {
+    res.json({
+      success: false,
+      message: "Invalid action. Use 'add' or 'deduct'",
+      data: null
+    });
+  }
+
 };
 
 exports.updateProfile = function (req, res) {
