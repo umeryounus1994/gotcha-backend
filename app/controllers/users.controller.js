@@ -208,13 +208,13 @@ module.exports.saveWatchadCoins = async function (req, res) {
       data: null
     });
   }
-  var userData = await UserCoins.findOne({UserId: UserId});
+  var userData = await UserCoins.findOne({UserId});
   if(userData == null){
       var userCoints = new UserCoins();
       userCoints.UserId = UserId;
       userCoints.HeldCoins = COIN_VALUE;
       userCoints.save();
-      res.json({
+      return res.json({
         success: true,
         message: "Coins added successfully",
         data: {
@@ -224,7 +224,7 @@ module.exports.saveWatchadCoins = async function (req, res) {
   }
   if (action === 'add') {
     // Add coins for watching ad
-    userData.HeldCoins = (userData.HeldCoins || 0) + COIN_VALUE;
+    userData.HeldCoins = (userData?.HeldCoins || 0) + COIN_VALUE;
     
     userData.save(function (err, updatedUser) {
       if (err) {
@@ -235,7 +235,7 @@ module.exports.saveWatchadCoins = async function (req, res) {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         message: "Coins added successfully",
         data: {
@@ -254,7 +254,7 @@ module.exports.saveWatchadCoins = async function (req, res) {
     }
 
     // Deduct coins
-    userData.HeldCoins = (userData.HeldCoins || 0) - COIN_VALUE;
+    userData.HeldCoins = (userData?.HeldCoins || 0) - COIN_VALUE;
     
     userData.save(function (err, updatedUser) {
       if (err) {
@@ -265,7 +265,7 @@ module.exports.saveWatchadCoins = async function (req, res) {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         message: "Coins deducted successfully",
         data: {
@@ -274,7 +274,7 @@ module.exports.saveWatchadCoins = async function (req, res) {
       });
     });
   } else {
-    res.json({
+    return res.json({
       success: false,
       message: "Invalid action. Use 'add' or 'deduct'",
       data: null
