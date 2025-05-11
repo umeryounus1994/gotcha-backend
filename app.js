@@ -9,7 +9,10 @@ let Token = require("./app/token");
 var logger = require('morgan');
 var multer = require('multer');
 var upload = multer();
-var offersClaimedModel = require('./app/models/offer-claimed.model.js');
+var OffersHeld = require('./app/models/offer-held.model.js');
+var OffersClaimedModel = require('./app/models/offer-claimed.model.js');
+var moment = require('moment'); // require
+moment().format(); 
 // global.CronJob = require('./app/cron.js');
 
 // Import: Routes
@@ -58,7 +61,41 @@ app.listen(port, function () {
   console.log("Running Services on port " + port);
 });
 
-// offersClaimedModel.updateMany({Status: "pending"}).then((offers) => {
-// }).catch((err) => {
-// console.log("Error updating offers: ", err);
-// });
+
+
+async function checkAndUpdateOffer() {
+  try {
+    const heldOffers = await OffersHeld.find({ Status: 'pending' }).sort({ CreationTimestamp: 1 });
+    console.log(heldOffers)
+
+    for (const heldOffer of heldOffers) {
+      const timeDiff = moment().diff(moment(heldOffer.CreationTimestamp), 'hours');
+
+      if (timeDiff >= 24) {
+        heldOffer.Status = 'claimed';
+        await heldOffer.save();
+
+        const findOffersClaimedModel = await OffersClaimedModel.findOne({
+          OfferId: heldOffer.OfferId,
+          ClaimedBy: heldOffer.UserId
+        });
+
+        if (findOffersClaimedModel) {
+          findOffersClaimedModel.Status = "requested";
+          await findOffersClaimedModel.save();
+          console.log('claimed');
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error in checkAndUpdateOffer:", error);
+  }
+}
+function startInterval() {
+  checkAndUpdateOffer().finally(() => {
+    setTimeout(startInterval, 3600000); // 1 minute
+  });
+}
+
+startInterval();
+
