@@ -395,11 +395,6 @@ exports.wallet = function (req, res) {
             data: null,
           });
         } else {
-          let vouchers = [];
-          let cryptocurrency = [];
-          let other = [];
-          let rating = [];
-          let collectibles = [];
           let walletOffers = [];
 
           data.forEach((offer) => {
@@ -422,32 +417,7 @@ exports.wallet = function (req, res) {
               };
   
               walletOffers.push(temp);
-
-
-            // if (offer.Type._id == '5ecc44d56867c03a18c5f344') {
-            //   other.push(temp);
-            // }
-            // if (offer.Type._id == "5ec43bd29ff6134be84d7dab") {
-            //   vouchers.push(temp);
-            // }
-            // if (offer.Type._id == "5ec43c5cce2b0f59a0d874e0") {
-            //   cryptocurrency.push(temp);
-            // }
-            // if (offer.Type._id == "5f9325294e59085014dad9ec") {
-            //   rating.push(temp);
-            // }
-            // if (offer.Type._id == "5ec43c3dce2b0f59a0d874df") {
-            //   collectibles.push(temp);
-            // }
           });
-
-          // var wallet = {
-          //   Other: other,
-          //   Vouchers: vouchers,
-          //   Cryptocurrency: cryptocurrency,
-          //   Rating: rating,
-          //   Collectibles: collectibles,
-          // };
 
           res.json({
             success: true,
@@ -484,8 +454,6 @@ exports.walletByCurrentDate = function (req, res) {
       $lte: moment(today).endOf('day').toDate()
     } 
   };
-
-  console.log("query ",query)
   var selection = {
     __v: 0,
     IsActive: 0,
@@ -509,11 +477,6 @@ exports.walletByCurrentDate = function (req, res) {
             data: null,
           });
         } else {
-          let vouchers = [];
-          let cryptocurrency = [];
-          let other = [];
-          let rating = [];
-          let collectibles = [];
           let walletOffers = [];
 
           data.forEach((offer) => {
@@ -533,32 +496,7 @@ exports.walletByCurrentDate = function (req, res) {
               };
   
               walletOffers.push(temp);
-
-
-            // if (offer.Type._id == '5ecc44d56867c03a18c5f344') {
-            //   other.push(temp);
-            // }
-            // if (offer.Type._id == "5ec43bd29ff6134be84d7dab") {
-            //   vouchers.push(temp);
-            // }
-            // if (offer.Type._id == "5ec43c5cce2b0f59a0d874e0") {
-            //   cryptocurrency.push(temp);
-            // }
-            // if (offer.Type._id == "5f9325294e59085014dad9ec") {
-            //   rating.push(temp);
-            // }
-            // if (offer.Type._id == "5ec43c3dce2b0f59a0d874df") {
-            //   collectibles.push(temp);
-            // }
           });
-
-          // var wallet = {
-          //   Other: other,
-          //   Vouchers: vouchers,
-          //   Cryptocurrency: cryptocurrency,
-          //   Rating: rating,
-          //   Collectibles: collectibles,
-          // };
 
           res.json({
             success: true,

@@ -274,6 +274,14 @@ exports.holdOffer = async function (req, res) {
       data: null,
     });
   }
+  let offerData = await Offers.findById(OfferId);
+  if (!offerData) {
+    return res.json({
+      success: false,
+      message: 'Offer not found.',
+      data: null,
+    });
+  }
 
   // Find the first held offer for the given OfferId
   let heldOffer = await OffersHeld.findOne({ OfferId: OfferId, Status: 'pending' }).sort({ CreationTimestamp: 1 });
@@ -286,6 +294,11 @@ exports.holdOffer = async function (req, res) {
       // If 24 hours have passed, update the status to 'claimed'
       heldOffer.Status = 'claimed';
       await heldOffer.save(); // Save the updated status
+      var findOffersClaimedModel = await OffersClaimedModel.findOne({OfferId: OfferId});
+      if(findOffersClaimedModel){
+        findOffersClaimedModel.Status = "requested";
+        findOffersClaimedModel.save();
+      }
       res.json({
         success: false,
         message: 'Offer was automatically claimed after 24 hours.',
@@ -296,14 +309,7 @@ exports.holdOffer = async function (req, res) {
   }
 
   // If no pending offer or 24 hours haven't passed, continue with holding the offer
-  let offerData = await Offers.findById(OfferId);
-  if (!offerData) {
-    return res.json({
-      success: false,
-      message: 'Offer not found.',
-      data: null,
-    });
-  }
+ 
 
   // Check if the offer has already been claimed by someone else
   let existingClaim = await OffersHeld.find({ OfferId: OfferId, Status: 'claimed' });
@@ -322,16 +328,50 @@ exports.holdOffer = async function (req, res) {
       data: null
     });
   }
-  // Otherwise, create a new held offer
-  var location = { type: 'Point', coordinates: [req.body.lng, req.body.lat] };
-  if(!heldOffer){
-    let reqData = {
-      HeldBy: UserId,
-      OfferId: offerData._id,
-      Location: location,
-      Status: 'pending', // Set the status as pending initially
-      CreationTimestamp: Date.now(), // Store when the offer was held
-    };
+
+      let a = moment(new Date()); 
+      if(offerData.ReAppear){
+        reAvailabilityTime = a.clone().add(offerData.ReAppearTime, 'hours'); 
+      } else {
+        reAvailabilityTime = a.clone().add(100, 'years'); 
+      }
+
+      offerData.ClaimedBy.forEach((element,i)=>{
+        if(element.UserId == UserId){
+          userExist = true;
+          userExistData = element;
+          userExistIndex = i;
+        }
+      });
+
+      offerData.IsActive = false;
+      await offerData.save();
+      var location = { type: 'Point', coordinates: [req.body.lng, req.body.lat] };
+      // console.log("update offer doc ",doc)
+      let reqData = {
+        ClaimedBy: UserId,
+        OfferId: OfferId,
+        Type: offerData.Type,
+        OfferedBy: offerData.OfferedBy,
+        Value: offerData.Value,
+        Link: offerData.Link,
+        Name: offerData.Name,
+        Email: offerData.Email,
+        Location: location,
+        Icon: offerData.Icon,
+        Status: 'pending'
+      }
+      await OffersClaimedModel.create(reqData);
+    // Otherwise, create a new held offer
+
+    if(!heldOffer){
+      let reqData = {
+        HeldBy: UserId,
+        OfferId: offerData._id,
+        Location: location,
+        Status: 'pending', // Set the status as pending initially
+        CreationTimestamp: Date.now(), // Store when the offer was held
+      };
   
     // Create the held offer entry
     await OffersHeld.create(reqData);
@@ -457,7 +497,7 @@ exports.claim = async function (req, res) {
         Icon: offerData.Icon,
         Status: 'requested'
       }
-      const OffersClaimedDoc = await OffersClaimedModel.create(reqData);
+      await OffersClaimedModel.create(reqData);
       lastHeldOffer.Status = "claimed";
       lastHeldOffer.save();
 
