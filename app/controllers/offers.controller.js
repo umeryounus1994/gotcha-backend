@@ -294,7 +294,7 @@ exports.holdOffer = async function (req, res) {
       // If 24 hours have passed, update the status to 'claimed'
       heldOffer.Status = 'claimed';
       await heldOffer.save(); // Save the updated status
-      var findOffersClaimedModel = await OffersClaimedModel.findOne({OfferId: OfferId});
+      var findOffersClaimedModel = await OffersClaimedModel.findOne({OfferId: OfferId, UserId: heldOffer?.UserId});
       if(findOffersClaimedModel){
         findOffersClaimedModel.Status = "requested";
         findOffersClaimedModel.save();
