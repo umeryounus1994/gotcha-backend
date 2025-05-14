@@ -400,12 +400,13 @@ exports.wallet = function (req, res) {
           data.forEach((offer) => {
 
               let temp = {
+                OfferClaimedId: offer?._id || "",
                 SponsorId: offer.OfferedBy?._id || "",
                 SponsorName: offer.OfferedBy?.BusinessName || "",
                 SponsorLogo: offer.OfferedBy?.BusinessLogo || "",
                 SponsorNumber: offer.OfferedBy?.ContactNumber || "",
                 OfferType: offer?.Type?.Name || "",
-                OfferId: offer?._id || "",
+                OfferId: offer?.OfferId || "",
                 OfferValue: offer?.Value || 0,
                 OfferLink: offer?.Link || "",
                 OfferName: offer?.Name || "",
