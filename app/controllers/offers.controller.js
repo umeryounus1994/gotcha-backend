@@ -385,7 +385,6 @@ exports.holdOffer = async function (req, res) {
   } else {
     heldOffer.UserId = UserId;
     heldOffer.Location = location;
-    heldOffer.CreationTimestamp = Date.now();
     heldOffer.save();
     res.json({
       success: true,
@@ -416,13 +415,13 @@ exports.remainingOfferTime = async function (req, res) {
     let timeDiff = moment().diff(moment(heldOffer.CreationTimestamp), 'hours'); // Time difference in hours
     res.json({
       success: true,
-      message: 'Timer Data',
-      data: timeDiff,
+      message: 'Remaining Time Data',
+      data: 24-timeDiff,
     });
   } else {
     res.json({
       success: true,
-      message: 'Timer Data',
+      message: 'Remaining Time Data',
       data: 24,
     });
   }

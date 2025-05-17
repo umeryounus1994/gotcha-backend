@@ -66,7 +66,6 @@ app.listen(port, function () {
 async function checkAndUpdateOffer() {
   try {
     const heldOffers = await OffersHeld.find({ Status: 'pending' }).sort({ CreationTimestamp: 1 });
-    console.log(heldOffers)
 
     for (const heldOffer of heldOffers) {
       const timeDiff = moment().diff(moment(heldOffer.CreationTimestamp), 'hours');

@@ -37,8 +37,11 @@ const offersHeldSchema = new schema({
     default: "pending", // pending, requested
   },
   CreationTimestamp: {
+    type: Date
+  },
+  UpdatedTimestamp: {
     type: Date,
-    default: Date.now,
+    default: Date.now
   },
 });
 
