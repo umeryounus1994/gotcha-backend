@@ -1,11 +1,11 @@
 let Offers = require('../models/offers.model');
 let OffersHeld = require('../models/offer-held.model');
 let OffersClaimedModel = require('../models/offer-claimed.model');
-
+let UserCoins = require('../models/user-coins.model');
 const uploadIcon = require('../utilities/uploaders/map-icon.uploader');
 const haversine = require('haversine');
 var moment = require('moment'); // require
-moment().format(); 
+moment().format();
 
 exports.addOffer = function (offers, callback) {
   Offers.insertMany(offers, callback);
@@ -81,7 +81,7 @@ exports.list = function (req, res) {
   var query = {};
   const pageSize = 500;
   if (lastId) {
-    query = {_id: { '$gt': lastId}};
+    query = { _id: { '$gt': lastId } };
   }
   var selection = {
     __v: 0,
@@ -166,7 +166,7 @@ exports.Claimedlist = function (req, res) {
         success: true,
         message: data.length + ' Records Found.',
         data: data,
-        count: data.length 
+        count: data.length
       });
     }
   })
@@ -198,9 +198,9 @@ exports.ClaimRequest = function (req, res) {
     });
   }
   var query = {
-  _id: id
+    _id: id
   };
-  OffersClaimedModel.updateOne(query, {Status: "requested"}, function (err, data) {
+  OffersClaimedModel.updateOne(query, { Status: "requested" }, function (err, data) {
     if (err) {
       res.json({
         success: false,
@@ -265,15 +265,23 @@ exports.claimed = function (req, res) {
 exports.holdOffer = async function (req, res) {
   var OfferId = req.body.OfferId;
   var UserId = req.body.UserId;
-
-  let heldOfferUser = await OffersHeld.findOne({ OfferId: OfferId, UserId: UserId, Status: 'pending' });
-  if(heldOfferUser){
-    res.json({
+  let findCoins = await UserCoins.findOne({ UserId: UserId });
+  if (!findCoins || findCoins?.HeldCoins < 200000) {
+    return res.json({
       success: false,
-      message: 'You have already placed this offer before',
+      message: 'Not enough coins to plant this offer',
       data: null,
     });
   }
+
+  // let heldOfferUser = await OffersHeld.findOne({ OfferId: OfferId, UserId: UserId, Status: 'pending' });
+  // if(heldOfferUser){
+  //   return res.json({
+  //     success: false,
+  //     message: 'You have already placed this offer before',
+  //     data: null,
+  //   });
+  // }
   let offerData = await Offers.findById(OfferId);
   if (!offerData) {
     return res.json({
@@ -294,10 +302,12 @@ exports.holdOffer = async function (req, res) {
       // If 24 hours have passed, update the status to 'claimed'
       heldOffer.Status = 'claimed';
       await heldOffer.save(); // Save the updated status
-      var findOffersClaimedModel = await OffersClaimedModel.findOne({OfferId: OfferId, ClaimedBy: heldOffer?.UserId});
-      if(findOffersClaimedModel){
+      var findOffersClaimedModel = await OffersClaimedModel.findOne({ OfferId: OfferId, ClaimedBy: heldOffer?.UserId });
+      if (findOffersClaimedModel) {
         findOffersClaimedModel.Status = "requested";
         findOffersClaimedModel.save();
+        findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
+        findCoins.save();
       }
       res.json({
         success: false,
@@ -309,7 +319,7 @@ exports.holdOffer = async function (req, res) {
   }
 
   // If no pending offer or 24 hours haven't passed, continue with holding the offer
- 
+
 
   // Check if the offer has already been claimed by someone else
   let existingClaim = await OffersHeld.find({ OfferId: OfferId, Status: 'claimed' });
@@ -329,26 +339,39 @@ exports.holdOffer = async function (req, res) {
     });
   }
 
-      let a = moment(new Date()); 
-      if(offerData.ReAppear){
-        reAvailabilityTime = a.clone().add(offerData.ReAppearTime, 'hours'); 
-      } else {
-        reAvailabilityTime = a.clone().add(100, 'years'); 
-      }
+  let a = moment(new Date());
+  if (offerData.ReAppear) {
+    reAvailabilityTime = a.clone().add(offerData.ReAppearTime, 'hours');
+  } else {
+    reAvailabilityTime = a.clone().add(100, 'years');
+  }
 
-      offerData.ClaimedBy.forEach((element,i)=>{
-        if(element.UserId == UserId){
-          userExist = true;
-          userExistData = element;
-          userExistIndex = i;
-        }
-      });
+  offerData.ClaimedBy.forEach((element, i) => {
+    if (element.UserId == UserId) {
+      userExist = true;
+      userExistData = element;
+      userExistIndex = i;
+    }
+  });
 
-      offerData.IsActive = false;
-      await offerData.save();
-      var location = { type: 'Point', coordinates: [req.body.lng, req.body.lat] };
-      // console.log("update offer doc ",doc)
+  //offerData.IsActive = false;
+  await offerData.save();
+  var location = { type: 'Point', coordinates: [req.body.lng, req.body.lat] };
+  if (!heldOffer) {
+    let requestData = {
+      HeldBy: UserId,
+      OfferId: offerData._id,
+      Location: location,
+      Status: 'pending', // Set the status as pending initially
+      CreationTimestamp: Date.now(), // Store when the offer was held
+    };
+
+    // Create the held offer entry
+    const heldData = await OffersHeld.create(requestData);
+    const findClaimedOffer = await OffersClaimedModel.findOne({ OfferHeldId: heldData?._id });
+    if (!findClaimedOffer) {
       let reqData = {
+        OfferHeldId: heldData._id,
         ClaimedBy: UserId,
         OfferId: OfferId,
         Type: offerData.Type,
@@ -362,31 +385,30 @@ exports.holdOffer = async function (req, res) {
         Status: 'pending'
       }
       await OffersClaimedModel.create(reqData);
-    // Otherwise, create a new held offer
-
-    if(!heldOffer){
-      let reqData = {
-        HeldBy: UserId,
-        OfferId: offerData._id,
-        Location: location,
-        Status: 'pending', // Set the status as pending initially
-        CreationTimestamp: Date.now(), // Store when the offer was held
-      };
-  
-    // Create the held offer entry
-    await OffersHeld.create(reqData);
-  
+    } else {
+      findClaimedOffer.ClaimedBy = UserId;
+      findClaimedOffer.Status = 'pending';
+      findClaimedOffer.save();
+    }
+    findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
+    findCoins.save();
     // Send success response
-    res.json({
+    return res.json({
       success: true,
       message: 'Offer successfully held!',
       data: null,
     });
   } else {
-    heldOffer.UserId = UserId;
+    const findClaimedOffer = await OffersClaimedModel.findOne({ OfferHeldId: heldOffer?._id });
+    heldOffer.HeldBy = UserId;
     heldOffer.Location = location;
     heldOffer.save();
-    res.json({
+    findClaimedOffer.ClaimedBy = UserId;
+    findClaimedOffer.Status = 'pending';
+    findClaimedOffer.save();
+    findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
+    findCoins.save();
+    return res.json({
       success: true,
       message: 'Offer successfully held!',
       data: null,
@@ -399,15 +421,15 @@ exports.holdOffer = async function (req, res) {
 exports.remainingOfferTime = async function (req, res) {
   var OfferId = req.body.OfferId;
 
-   // Check if the offer has already been claimed by someone else
-   let existingClaim = await OffersHeld.findOne({ OfferId: OfferId, Status: 'claimed' });
-   if (existingClaim) {
-     return res.json({
-       success: false,
-       message: 'Offer already claimed.',
-       data: null,
-     });
-   }
+  // Check if the offer has already been claimed by someone else
+  let existingClaim = await OffersHeld.findOne({ OfferId: OfferId, Status: 'claimed' });
+  if (existingClaim) {
+    return res.json({
+      success: false,
+      message: 'Offer already claimed.',
+      data: null,
+    });
+  }
 
   // Find the first held offer for the given OfferId
   let heldOffer = await OffersHeld.findOne({ OfferId: OfferId, Status: 'pending' }).sort({ CreationTimestamp: 1 });
@@ -416,7 +438,7 @@ exports.remainingOfferTime = async function (req, res) {
     res.json({
       success: true,
       message: 'Remaining Time Data',
-      data: 24-timeDiff,
+      data: 24 - timeDiff,
     });
   } else {
     res.json({
@@ -425,7 +447,7 @@ exports.remainingOfferTime = async function (req, res) {
       data: 24,
     });
   }
-  
+
 };
 
 
@@ -434,10 +456,10 @@ exports.claim = async function (req, res) {
   var OfferId = req.body.OfferId;
 
   let lastHeldOffer = await OffersHeld.findOne({ OfferId: OfferId })
-                                    .sort({ CreationTimestamp: -1 }); // or use a timestamp field if available
-  
+    .sort({ CreationTimestamp: -1 }); // or use a timestamp field if available
+
   let ClaimedOffer = await OffersHeld.findOne({ OfferId: OfferId, Status: "claimed" });
-  if(ClaimedOffer){
+  if (ClaimedOffer) {
     res.json({
       success: false,
       message: 'Offer already claimed',
@@ -445,7 +467,7 @@ exports.claim = async function (req, res) {
     });
   }
 
-  if(!lastHeldOffer){
+  if (!lastHeldOffer) {
     res.json({
       success: false,
       message: 'This offer is not held by any user',
@@ -456,15 +478,15 @@ exports.claim = async function (req, res) {
 
   let offerData = await Offers.findById(OfferId);
 
-  let a = moment(new Date()); 
-  if(offerData.ReAppear){
-    reAvailabilityTime = a.clone().add(offerData.ReAppearTime, 'hours'); 
+  let a = moment(new Date());
+  if (offerData.ReAppear) {
+    reAvailabilityTime = a.clone().add(offerData.ReAppearTime, 'hours');
   } else {
-    reAvailabilityTime = a.clone().add(100, 'years'); 
+    reAvailabilityTime = a.clone().add(100, 'years');
   }
 
-  offerData.ClaimedBy.forEach((element,i)=>{
-    if(element.UserId == UserId){
+  offerData.ClaimedBy.forEach((element, i) => {
+    if (element.UserId == UserId) {
       userExist = true;
       userExistData = element;
       userExistIndex = i;
@@ -472,8 +494,8 @@ exports.claim = async function (req, res) {
   });
 
   offerData.IsActive = false;
-  
-    offerData.save(async function (err) {
+
+  offerData.save(async function (err) {
     if (err) {
       res.json({
         success: false,
@@ -529,63 +551,63 @@ exports.get = async function (req, res) {
 
   let currentDate = new Date();
   //console.log("currentDate ",currentDate)
-//   let offerData = await Offers.find({
-//     Expire: { $gte: currentDate }, IsActive: true 
-//     })
-//  .populate({path:'OfferedBy', select:[ 'BusinessName', 'BusinessWebsite', 'BusinessLogo', 'ContactNumber']});
+  //   let offerData = await Offers.find({
+  //     Expire: { $gte: currentDate }, IsActive: true 
+  //     })
+  //  .populate({path:'OfferedBy', select:[ 'BusinessName', 'BusinessWebsite', 'BusinessLogo', 'ContactNumber']});
 
   let offerData = await Offers.find({
-      // $or: [
-      //   { $and: [ {'ClaimedBy.$.UserId': userId}, {'ClaimedBy.$.AvailabilityTimestamp': { $lte: currentDate } } ] },
-      //   {'ClaimedBy.$.UserId': { $ne: userId } }
-      // ],
-     Expire: { $gte: currentDate }, IsActive: true 
-     })
-  .populate({path:'OfferedBy', select:[ 'BusinessName', 'BusinessWebsite', 'BusinessLogo', 'ContactNumber']})
-  .populate({path:'Type', select:[ 'Name', 'AppPicture', 'ModelPicture']})
-  .populate({path: 'MarkerType', select: ['Name', 'Picture']});
+    // $or: [
+    //   { $and: [ {'ClaimedBy.$.UserId': userId}, {'ClaimedBy.$.AvailabilityTimestamp': { $lte: currentDate } } ] },
+    //   {'ClaimedBy.$.UserId': { $ne: userId } }
+    // ],
+    Expire: { $gte: currentDate }, IsActive: true
+  })
+    .populate({ path: 'OfferedBy', select: ['BusinessName', 'BusinessWebsite', 'BusinessLogo', 'ContactNumber'] })
+    .populate({ path: 'Type', select: ['Name', 'AppPicture', 'ModelPicture'] })
+    .populate({ path: 'MarkerType', select: ['Name', 'Picture'] });
   filteredOffers = []
   offerData.forEach((element) => {
     let obj = element.ClaimedBy.find(user => user.UserId == userId);
     //console.log("obj ",obj);
-    if(obj == undefined){
+    if (obj == undefined) {
       filteredOffers.push(element);
-    } else if(obj.AvailabilityTimestamp <= currentDate) {
+    } else if (obj.AvailabilityTimestamp <= currentDate) {
       filteredOffers.push(element);
     }
-    
-  });  
+
+  });
 
 
-    let msg = '';
+  let msg = '';
 
-    offersList = [];
-    filteredOffers.forEach((element)=>{
-      let endLocation = {
-        latitude: element.Location.coordinates[1],
-        longitude: element.Location.coordinates[0]
-      }
+  offersList = [];
+  filteredOffers.forEach((element) => {
+    let endLocation = {
+      latitude: element.Location.coordinates[1],
+      longitude: element.Location.coordinates[0]
+    }
     //console.log("endLocation ", endLocation)
     const locationDistance = haversine(userLocation, endLocation, { unit: 'meter' })
-   // console.log("locationDistance ", locationDistance)
+    // console.log("locationDistance ", locationDistance)
     if (locationDistance < distance) {
       offersList.push(element)
     }
-    })
+  })
 
 
 
-    if (offersList.length == 0) {
-      msg = 'No Offers Found';
-    } else {
-      msg = offersList.length + ' Offers Found.';
-    }
+  if (offersList.length == 0) {
+    msg = 'No Offers Found';
+  } else {
+    msg = offersList.length + ' Offers Found.';
+  }
 
-    res.json({
-      success: true,
-      message: msg,
-      data: offersList,
-    });
+  res.json({
+    success: true,
+    message: msg,
+    data: offersList,
+  });
 
 
   // Offers.aggregate(
@@ -663,7 +685,7 @@ exports.get = async function (req, res) {
   //       });
   //     }
   //   }
-    
+
   // );
 
 };
@@ -688,64 +710,64 @@ exports.getByTypeId = async function (req, res) {
 
   let currentDate = new Date();
   //console.log("currentDate ",currentDate)
-//   let offerData = await Offers.find({
-//     Expire: { $gte: currentDate }, IsActive: true 
-//     })
-//  .populate({path:'OfferedBy', select:[ 'BusinessName', 'BusinessWebsite', 'BusinessLogo', 'ContactNumber']});
+  //   let offerData = await Offers.find({
+  //     Expire: { $gte: currentDate }, IsActive: true 
+  //     })
+  //  .populate({path:'OfferedBy', select:[ 'BusinessName', 'BusinessWebsite', 'BusinessLogo', 'ContactNumber']});
 
   let offerData = await Offers.find({
-      // $or: [
-      //   { $and: [ {'ClaimedBy.$.UserId': userId}, {'ClaimedBy.$.AvailabilityTimestamp': { $lte: currentDate } } ] },
-      //   {'ClaimedBy.$.UserId': { $ne: userId } }
-      // ],
-     Type: typeId,
-     Expire: { $gte: currentDate }, IsActive: true 
-     })
-  .populate({path:'OfferedBy', select:[ 'BusinessName', 'BusinessWebsite', 'BusinessLogo', 'ContactNumber']})
-  .populate({path:'Type', select:[ 'Name']})
+    // $or: [
+    //   { $and: [ {'ClaimedBy.$.UserId': userId}, {'ClaimedBy.$.AvailabilityTimestamp': { $lte: currentDate } } ] },
+    //   {'ClaimedBy.$.UserId': { $ne: userId } }
+    // ],
+    Type: typeId,
+    Expire: { $gte: currentDate }, IsActive: true
+  })
+    .populate({ path: 'OfferedBy', select: ['BusinessName', 'BusinessWebsite', 'BusinessLogo', 'ContactNumber'] })
+    .populate({ path: 'Type', select: ['Name'] })
 
   filteredOffers = []
   offerData.forEach((element) => {
     let obj = element.ClaimedBy.find(user => user.UserId == userId);
     //console.log("obj ",obj);
-    if(obj == undefined){
+    if (obj == undefined) {
       filteredOffers.push(element);
-    } else if(obj.AvailabilityTimestamp <= currentDate) {
+    } else if (obj.AvailabilityTimestamp <= currentDate) {
       filteredOffers.push(element);
     }
-    
-  });  
+
+  });
 
 
-    let msg = '';
+  let msg = '';
 
-    offersList = [];
-    filteredOffers.forEach((element)=>{
-      let endLocation = {
-        latitude: element.Location.coordinates[1],
-        longitude: element.Location.coordinates[0]
+  offersList = [];
+  filteredOffers.forEach((element) => {
+    let endLocation = {
+      latitude: element.Location.coordinates[1],
+      longitude: element.Location.coordinates[0]
     }
     //console.log("endLocation ", endLocation)
     const locationDistance = haversine(userLocation, endLocation, { unit: 'meter' })
-   // console.log("locationDistance ", locationDistance)
+    // console.log("locationDistance ", locationDistance)
     if (locationDistance < distance) {
       offersList.push(element)
     }
-    })
+  })
 
 
 
-    if (offersList.length == 0) {
-      msg = 'No Offers Found';
-    } else {
-      msg = offersList.length + ' Offers Found.';
-    }
+  if (offersList.length == 0) {
+    msg = 'No Offers Found';
+  } else {
+    msg = offersList.length + ' Offers Found.';
+  }
 
-    res.json({
-      success: true,
-      message: msg,
-      data: offersList,
-    });
+  res.json({
+    success: true,
+    message: msg,
+    data: offersList,
+  });
 
 
   // Offers.aggregate(
@@ -823,7 +845,7 @@ exports.getByTypeId = async function (req, res) {
   //       });
   //     }
   //   }
-    
+
   // );
 
 };
@@ -831,7 +853,7 @@ exports.getByTypeId = async function (req, res) {
 
 exports.updateScript = function (req, res) {
 
-  Offers.updateMany({},{Type: '613b1b4afbdc53762644c70b'}, {new: true}, function (err, data) {
+  Offers.updateMany({}, { Type: '613b1b4afbdc53762644c70b' }, { new: true }, function (err, data) {
     if (err) {
       res.json({
         success: false,
@@ -897,7 +919,7 @@ function deleteExpired() {
         var offerDate = new Date(offer.Expire);
         if (offerDate < currentDate) {
           var selection = { _id: offer._id };
-          Offers.deleteOne(selection, function callback(err, doc) {});
+          Offers.deleteOne(selection, function callback(err, doc) { });
         }
       });
     }

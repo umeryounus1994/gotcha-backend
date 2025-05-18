@@ -37,7 +37,9 @@
     "node-excel-export": "^1.4.4",
     "nodemailer": "^6.4.11",
     "nodemon": "^2.0.4",
+    "square": "^42.2.0",
     "tinify": "^1.6.0-beta.2",
+    "uuid": "^11.1.0",
     "web3": "^1.2.11"
   }
 }

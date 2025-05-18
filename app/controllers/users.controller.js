@@ -7,10 +7,6 @@ const PackagesModel = require("../models/packages.model");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
 
-const uploadProfilePicture = require("../utilities/uploaders/profile-image.uploader");
-const mediaUpload = require("../utilities/media_upload");
-
-let mailer = require("../utilities/mailer");
 
 let jwt = require("jsonwebtoken");
 let Constants = require("../app.constants");
@@ -19,6 +15,10 @@ const moment = require('moment')
 const momenttz = require('moment-timezone');
 
 momenttz.tz.setDefault('Australia/Brisbane');
+
+const { v4: uuidv4 } = require('uuid');
+const client = require('./../utilities/squareClient.js');
+const { SquareError } = require("square");
 
 // Login:
 exports.login = function (req, res) {
@@ -1052,5 +1052,33 @@ exports.getCoins = async function (req, res) {
         HeldCoins: findUserCoins.HeldCoins
       }
     });
+  }
+};
+
+exports.registerSquareCustomer = async function (req, res) {
+  try {
+    const {FirstName, Email, CardNumber, ExpiryDate, CVC } = req.body;
+    const findUser = await Users.findOne({Email: Email});
+    if(!findUser){
+      return res.json({
+        status: false,
+        message: "No user found against this email",
+        data: null
+    })
+    }
+    console.log(client)
+    const response = client.customers.create({
+      idempotencyKey: uuidv4(),
+      emailAddress: Email,
+      companyName: FirstName
+    });
+
+    console.log('Customer created:', response.result);
+  } catch (error) {
+    if (error instanceof SquareError) {
+      console.error("Error occurred: " + error.message);
+    } else {
+      console.error("Unexpected error occurred: ", error);
+    }
   }
 };

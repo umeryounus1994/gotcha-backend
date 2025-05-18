@@ -20,6 +20,11 @@ const offersClaimedSchema = new schema({
     ref: 'offers',
     required: true,
   },
+  OfferHeldId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'offersHeld',
+    required: true,
+  },
   Type: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'offer-types',
