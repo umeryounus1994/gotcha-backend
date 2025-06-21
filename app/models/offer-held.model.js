@@ -36,6 +36,11 @@ const offersHeldSchema = new schema({
     type: String,
     default: "pending", // pending, requested
   },
+  HeldType: {
+    type: String,
+    default: "original", // pending, requested,
+    enum: ['original', 'replanted']
+  },
   CreationTimestamp: {
     type: Date
   },

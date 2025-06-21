@@ -649,7 +649,7 @@ router.route("/users/watchAddTeleport").post(usersController.saveWatchadCoins);
 router.route("/users/remaining-coins").post(usersController.remainingCoins);
 
 
-router.route("/users/register-square-customer").post(usersController.registerSquareCustomer);
+// router.route("/users/register-square-customer").post(usersController.registerSquareCustomer);
 
 module.exports = {
   apiRoutes: router,

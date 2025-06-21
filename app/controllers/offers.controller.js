@@ -363,7 +363,8 @@ exports.holdOffer = async function (req, res) {
       OfferId: offerData._id,
       Location: location,
       Status: 'pending', // Set the status as pending initially
-      CreationTimestamp: Date.now(), // Store when the offer was held
+      CreationTimestamp: Date.now(), // Store when the offer was held,
+      HeldType: req.body.HeldType
     };
 
     // Create the held offer entry
@@ -382,12 +383,14 @@ exports.holdOffer = async function (req, res) {
         Email: offerData.Email,
         Location: location,
         Icon: offerData.Icon,
-        Status: 'pending'
+        Status: 'pending',
+        HeldType: req.body.HeldType
       }
       await OffersClaimedModel.create(reqData);
     } else {
       findClaimedOffer.ClaimedBy = UserId;
       findClaimedOffer.Status = 'pending';
+      findClaimedOffer.HeldType = req.body.HeldType;
       findClaimedOffer.save();
     }
     findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
@@ -402,9 +405,11 @@ exports.holdOffer = async function (req, res) {
     const findClaimedOffer = await OffersClaimedModel.findOne({ OfferHeldId: heldOffer?._id });
     heldOffer.HeldBy = UserId;
     heldOffer.Location = location;
+    heldOffer.HeldType = req.body.HeldType;
     heldOffer.save();
     findClaimedOffer.ClaimedBy = UserId;
     findClaimedOffer.Status = 'pending';
+    findClaimedOffer.HeldType = req.body.HeldType;
     findClaimedOffer.save();
     findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
     findCoins.save();

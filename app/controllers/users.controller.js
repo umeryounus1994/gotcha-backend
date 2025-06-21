@@ -17,8 +17,13 @@ const momenttz = require('moment-timezone');
 momenttz.tz.setDefault('Australia/Brisbane');
 
 const { v4: uuidv4 } = require('uuid');
-const client = require('./../utilities/squareClient.js');
-const { SquareError } = require("square");
+
+// const { SquareClient, SquareEnvironment, SquareError } = require("square");
+
+// const client = new SquareClient({
+//   token: "EAAAl7C7rQPXu_QbyFhfYvWqTiM_r0fgZl0JMzTp8CI1OhGMF64pAbnsXTggItqB",
+//   environment: SquareEnvironment.Production,
+// });
 
 // Login:
 exports.login = function (req, res) {
@@ -37,9 +42,9 @@ exports.login = function (req, res) {
               var usercoins = await UserCoins.findOne({ UserId: user._id });
               var currDate = momenttz();
               var PurchasePackageExpired = false;
-              if(user.PackageExpiryDate && user.PackageExpiryDate != ""){
+              if (user.PackageExpiryDate && user.PackageExpiryDate != "") {
                 var cDate = momenttz(user.PackageExpiryDate);
-                if(cDate < currDate){
+                if (cDate < currDate) {
                   PurchasePackageExpired = false
                 } else {
                   PurchasePackageExpired = true;
@@ -188,13 +193,13 @@ exports.signup = function (req, res) {
 
 
 module.exports.updateUserProfile = async (useerId, userForm, options, callback) => {
-	var query = {_id: useerId};
-	Users.findOneAndUpdate(query, userForm, options, callback);
+  var query = { _id: useerId };
+  Users.findOneAndUpdate(query, userForm, options, callback);
 }
 
 // Get All Notification User 
 module.exports.getAllNotificationUser = (callback) => {
-	Users.find({Token: {$ne: ""}, IsDeleted: false, IsActive: true},callback);
+  Users.find({ Token: { $ne: "" }, IsDeleted: false, IsActive: true }, callback);
 }
 
 module.exports.saveWatchadCoins = async function (req, res) {
@@ -208,24 +213,24 @@ module.exports.saveWatchadCoins = async function (req, res) {
       data: null
     });
   }
-  var userData = await UserCoins.findOne({UserId});
-  if(userData == null){
-      var userCoints = new UserCoins();
-      userCoints.UserId = UserId;
-      userCoints.HeldCoins = COIN_VALUE;
-      userCoints.save();
-      return res.json({
-        success: true,
-        message: "Coins added successfully",
-        data: {
-          HeldCoins: COIN_VALUE
-        }
-      });
+  var userData = await UserCoins.findOne({ UserId });
+  if (userData == null) {
+    var userCoints = new UserCoins();
+    userCoints.UserId = UserId;
+    userCoints.HeldCoins = COIN_VALUE;
+    userCoints.save();
+    return res.json({
+      success: true,
+      message: "Coins added successfully",
+      data: {
+        HeldCoins: COIN_VALUE
+      }
+    });
   }
   if (action === 'add') {
     // Add coins for watching ad
     userData.HeldCoins = (userData?.HeldCoins || 0) + COIN_VALUE;
-    
+
     userData.save(function (err, updatedUser) {
       if (err) {
         return res.json({
@@ -255,7 +260,7 @@ module.exports.saveWatchadCoins = async function (req, res) {
 
     // Deduct coins
     userData.HeldCoins = (userData?.HeldCoins || 0) - COIN_VALUE;
-    
+
     userData.save(function (err, updatedUser) {
       if (err) {
         return res.json({
@@ -293,79 +298,79 @@ exports.updateProfile = function (req, res) {
   //       data: err,
   //     });
   //   }
-    var Id = req.body.Id;
-    //console.log("body ",req.body)
-    Users.findOne({ _id: Id }, function (err, user) {
-      if (err) {
-        res.json({
-          success: false,
-          message: "Validation Error",
-          data: err,
+  var Id = req.body.Id;
+  //console.log("body ",req.body)
+  Users.findOne({ _id: Id }, function (err, user) {
+    if (err) {
+      res.json({
+        success: false,
+        message: "Validation Error",
+        data: err,
+      });
+    } else {
+      if (user) {
+        var selection = { _id: Id };
+
+        var updatedData = {};
+
+        let userData = {
+          Id: user._id,
+          Name: user.FullName,
+          ContactNumber: user.ContactNumber,
+          Email: user.Email,
+          ETHAddress: user.ETHAddress,
+          ProfilePicture: null,
+        };
+
+        // if (req.file) {
+        //   updatedData.ProfilePicture = req.file.filename;
+
+        //   userData.ProfilePicture =
+        //     "https://" +
+        //     req.headers.host +
+        //     "/uploads/profile/" +
+        //     user.ProfilePicture;
+        // }
+
+        // if(req.files && req.files.ProfilePicture){
+        //   updatedData.ProfilePicture = req.files.ProfilePicture[0].location;
+        // }
+
+        if (req.body.ETHAddress) {
+          updatedData.ETHAddress = req.body.ETHAddress;
+          userData.ETHAddress = req.body.ETHAddress;
+        }
+
+        if (req.body.Name) {
+          updatedData.FullName = req.body.Name;
+          userData.Name = req.body.Name;
+        }
+
+        Users.updateOne(selection, updatedData, function callback(errr, doc) {
+          if (errr) {
+            res.json({
+              success: false,
+              message: "Validation Error",
+              data: errr,
+            });
+          } else {
+            console.log("User Profile Updated.");
+            res.json({
+              success: true,
+              message: "Successfully Updated!",
+              data: userData,
+            });
+          }
         });
       } else {
-        if (user) {
-          var selection = { _id: Id };
-
-          var updatedData = {};
-
-          let userData = {
-            Id: user._id,
-            Name: user.FullName,
-            ContactNumber: user.ContactNumber,
-            Email: user.Email,
-            ETHAddress: user.ETHAddress,
-            ProfilePicture: null,
-          };
-
-          // if (req.file) {
-          //   updatedData.ProfilePicture = req.file.filename;
-
-          //   userData.ProfilePicture =
-          //     "https://" +
-          //     req.headers.host +
-          //     "/uploads/profile/" +
-          //     user.ProfilePicture;
-          // }
-
-          // if(req.files && req.files.ProfilePicture){
-          //   updatedData.ProfilePicture = req.files.ProfilePicture[0].location;
-          // }
-
-          if (req.body.ETHAddress) {
-            updatedData.ETHAddress = req.body.ETHAddress;
-            userData.ETHAddress = req.body.ETHAddress;
-          }
-
-          if (req.body.Name) {
-            updatedData.FullName = req.body.Name;
-            userData.Name = req.body.Name;
-          }
-
-          Users.updateOne(selection, updatedData, function callback(errr, doc) {
-            if (errr) {
-              res.json({
-                success: false,
-                message: "Validation Error",
-                data: errr,
-              });
-            } else {
-              console.log("User Profile Updated.");
-              res.json({
-                success: true,
-                message: "Successfully Updated!",
-                data: userData,
-              });
-            }
-          });
-        } else {
-          res.json({
-            success: false,
-            message: "No User Found",
-            data: null,
-          });
-        }
+        res.json({
+          success: false,
+          message: "No User Found",
+          data: null,
+        });
       }
-    });
+    }
+  });
   // });
 };
 
@@ -399,25 +404,26 @@ exports.wallet = function (req, res) {
 
           data.forEach((offer) => {
 
-              let temp = {
-                OfferClaimedId: offer?._id || "",
-                SponsorId: offer.OfferedBy?._id || "",
-                SponsorName: offer.OfferedBy?.BusinessName || "",
-                SponsorLogo: offer.OfferedBy?.BusinessLogo || "",
-                SponsorNumber: offer.OfferedBy?.ContactNumber || "",
-                OfferType: offer?.Type?.Name || "",
-                OfferId: offer?.OfferId || "",
-                OfferValue: offer?.Value || 0,
-                OfferLink: offer?.Link || "",
-                OfferName: offer?.Name || "",
-                OfferEmail: offer?.Email || "",
-                OfferIcon: offer?.Icon || "",
-                OfferStatus: offer?.Status || "",
-                OfferSettled: offer?.IsSettled || false,
-                CreationTimestamp: offer?.CreationTimestamp || ""
-              };
-  
-              walletOffers.push(temp);
+            let temp = {
+              OfferClaimedId: offer?._id || "",
+              SponsorId: offer.OfferedBy?._id || "",
+              SponsorName: offer.OfferedBy?.BusinessName || "",
+              SponsorLogo: offer.OfferedBy?.BusinessLogo || "",
+              SponsorNumber: offer.OfferedBy?.ContactNumber || "",
+              OfferType: offer?.Type?.Name || "",
+              OfferId: offer?.OfferId || "",
+              OfferValue: offer?.Value || 0,
+              OfferLink: offer?.Link || "",
+              OfferName: offer?.Name || "",
+              OfferEmail: offer?.Email || "",
+              OfferIcon: offer?.Icon || "",
+              OfferStatus: offer?.Status || "",
+              OfferSettled: offer?.IsSettled || false,
+              CreationTimestamp: offer?.CreationTimestamp || "",
+              HeldType: offer?.HeldType || ""
+            };
+
+            walletOffers.push(temp);
           });
 
           res.json({
@@ -448,12 +454,12 @@ exports.wallet = function (req, res) {
 exports.walletByCurrentDate = function (req, res) {
   var UserId = req.query.UserId;
   const today = moment().startOf('day')
-  var query = { 
-    ClaimedBy: UserId, 
-    CreationTimestamp: { 
-      $gte: today.toDate(), 
+  var query = {
+    ClaimedBy: UserId,
+    CreationTimestamp: {
+      $gte: today.toDate(),
       $lte: moment(today).endOf('day').toDate()
-    } 
+    }
   };
   var selection = {
     __v: 0,
@@ -481,22 +487,22 @@ exports.walletByCurrentDate = function (req, res) {
           let walletOffers = [];
 
           data.forEach((offer) => {
-              let temp = {
-                SponsorId: offer.OfferedBy._id,
-                SponsorName: offer.OfferedBy.BusinessName,
-                SponsorLogo: offer.OfferedBy.BusinessLogo,
-                SponsorNumber: offer.OfferedBy.ContactNumber,
-                OfferType: offer.Type.Name,
-                OfferId: offer._id,
-                OfferValue: offer.Value || 0,
-                OfferLink: offer.Link,
-                OfferName: offer.Name,
-                OfferEmail: offer.Email,
-                OfferIcon: offer.Icon,
-                CreationTimestamp: offer.CreationTimestamp
-              };
-  
-              walletOffers.push(temp);
+            let temp = {
+              SponsorId: offer.OfferedBy._id,
+              SponsorName: offer.OfferedBy.BusinessName,
+              SponsorLogo: offer.OfferedBy.BusinessLogo,
+              SponsorNumber: offer.OfferedBy.ContactNumber,
+              OfferType: offer.Type.Name,
+              OfferId: offer._id,
+              OfferValue: offer.Value || 0,
+              OfferLink: offer.Link,
+              OfferName: offer.Name,
+              OfferEmail: offer.Email,
+              OfferIcon: offer.Icon,
+              CreationTimestamp: offer.CreationTimestamp
+            };
+
+            walletOffers.push(temp);
           });
 
           res.json({
@@ -525,7 +531,7 @@ exports.walletByCurrentDate = function (req, res) {
 };
 exports.getSingleUserDetails = function (req, res) {
   var UserId = req.body.UserId;
-  var query = { 
+  var query = {
     _id: UserId
   };
 
@@ -539,19 +545,19 @@ exports.getSingleUserDetails = function (req, res) {
         });
       } else {
         var currDate = momenttz();
-           if(data.PackageExpiryDate){
-                var cDate = momenttz(data.PackageExpiryDate);
-                if(cDate < currDate){
-                  data.PurchasePackageExpired = false
-                } else {
-                  data.PurchasePackageExpired = true;
-                }
-              } else {
-                data.PurchasePackageExpired = false;
-              }
+        if (data.PackageExpiryDate) {
+          var cDate = momenttz(data.PackageExpiryDate);
+          if (cDate < currDate) {
+            data.PurchasePackageExpired = false
+          } else {
+            data.PurchasePackageExpired = true;
+          }
+        } else {
+          data.PurchasePackageExpired = false;
+        }
         res.json({
           success: true,
-          message:" Record Found.",
+          message: " Record Found.",
           data: data,
         });
       }
@@ -622,7 +628,7 @@ exports.updateStatus = function (req, res) {
   var IsActive = req.body.IsActive;
   var IsDeleted = req.body.IsDeleted;
   var selection = { _id: Id };
-  var updatedData = { IsActive: IsActive, IsDeleted: IsDeleted};
+  var updatedData = { IsActive: IsActive, IsDeleted: IsDeleted };
   Users.update(selection, updatedData, function callback(errr, doc) {
     if (errr) {
       res.json({
@@ -824,14 +830,14 @@ exports.socialLogin = function (req, res) {
         if (user.IsActive) {
           var currDate = momenttz();
           var PurchasePackageExpired = false;
-           if(user.PackageExpiryDate){
-                var cDate = momenttz(user.PackageExpiryDate);
-                if(cDate < currDate){
-                  PurchasePackageExpired = false
-                } else {
-                  PurchasePackageExpired = true;
-                }
-              }
+          if (user.PackageExpiryDate) {
+            var cDate = momenttz(user.PackageExpiryDate);
+            if (cDate < currDate) {
+              PurchasePackageExpired = false
+            } else {
+              PurchasePackageExpired = true;
+            }
+          }
           let userData = {
             Id: user._id,
             Name: user.FullName,
@@ -914,15 +920,15 @@ exports.purchasePackage = function (req, res) {
   var EmailList = req.body.Email;
 
 
-  if(!EmailList) {
+  if (!EmailList) {
     return res.json({
       success: false,
       message: "Email is required",
       data: null,
     });
   }
-  if(!req.body.PackagePrice) {
-   return  res.json({
+  if (!req.body.PackagePrice) {
+    return res.json({
       success: false,
       message: "Package Price is required",
       data: null,
@@ -938,12 +944,14 @@ exports.purchasePackage = function (req, res) {
             else {
               if (user) {
                 var userId = user._id;
-           
+
                 var selection = { _id: userId };
-                var updatedData = { PurchasePackage: true,
+                var updatedData = {
+                  PurchasePackage: true,
                   PackagePrice: req.body.PackagePrice,
                   PackageDate: req.body.PackageDate || new Date(),
-                  PackageExpiryDate: req.body.PackageExpiryDate || new Date() };
+                  PackageExpiryDate: req.body.PackageExpiryDate || new Date()
+                };
                 Users.updateOne(
                   selection,
                   updatedData,
@@ -960,20 +968,20 @@ exports.purchasePackage = function (req, res) {
               }
             }
           });
-            resolvve(true);
+          resolvve(true);
         })
-    )
+      )
     }
-      return Promise.all(promiseArr).then(ress => {
-          return res.json({
-              status: true,
-              message: "Package has been purchase successfully",
-              data: null
-          })
+    return Promise.all(promiseArr).then(ress => {
+      return res.json({
+        status: true,
+        message: "Package has been purchase successfully",
+        data: null
       })
+    })
   });
 
- 
+
 };
 
 exports.remainingCoins = async function (req, res) {
@@ -984,52 +992,52 @@ exports.remainingCoins = async function (req, res) {
     message: 'Coins',
     data: usercoins?.HeldCoins || 0,
   });
-  
+
 };
 
 exports.getCoins = async function (req, res) {
   var Email = req.body.Email;
 
-  if(!Email) {
+  if (!Email) {
     return res.json({
       success: false,
       message: "Email is required",
       data: null,
     });
   }
-  if(!req.body.PackagePrice) {
-   return  res.json({
+  if (!req.body.PackagePrice) {
+    return res.json({
       success: false,
       message: "Package Price is required",
       data: null,
     });
   }
-  var packageData = await PackagesModel.findOne({Price: req.body.PackagePrice});
-  if(!packageData){
-    return  res.json({
+  var packageData = await PackagesModel.findOne({ Price: req.body.PackagePrice });
+  if (!packageData) {
+    return res.json({
       success: false,
       message: "Package not found",
       data: null,
     });
   }
-  var userData = await Users.findOne({Email: req.body.Email});
-  if(!userData){
-    return  res.json({
+  var userData = await Users.findOne({ Email: req.body.Email });
+  if (!userData) {
+    return res.json({
       success: false,
       message: "User with email not found",
       data: null,
     });
   }
   var findUserCoins = await UserCoins.findOne({ UserId: userData?._id });
-  if(!findUserCoins){
+  if (!findUserCoins) {
     var userCoints = new UserCoins();
     userCoints.UserId = userData?._id;
-    if(packageData?.FreeCoins > 0){
+    if (packageData?.FreeCoins > 0) {
       userCoints.HeldCoins = packageData?.Coins + packageData?.FreeCoins;
     } else {
       userCoints.HeldCoins = packageData?.Coins;
     }
-    
+
     userCoints.save();
     res.json({
       success: true,
@@ -1039,7 +1047,7 @@ exports.getCoins = async function (req, res) {
       }
     });
   } else {
-    if(packageData?.FreeCoins > 0){
+    if (packageData?.FreeCoins > 0) {
       findUserCoins.HeldCoins = packageData?.Coins + packageData?.FreeCoins;
     } else {
       findUserCoins.HeldCoins = packageData?.Coins;
@@ -1055,30 +1063,66 @@ exports.getCoins = async function (req, res) {
   }
 };
 
-exports.registerSquareCustomer = async function (req, res) {
-  try {
-    const {FirstName, Email, CardNumber, ExpiryDate, CVC } = req.body;
-    const findUser = await Users.findOne({Email: Email});
-    if(!findUser){
-      return res.json({
-        status: false,
-        message: "No user found against this email",
-        data: null
-    })
-    }
-    console.log(client)
-    const response = client.customers.create({
-      idempotencyKey: uuidv4(),
-      emailAddress: Email,
-      companyName: FirstName
-    });
+// exports.registerSquareCustomer = async function (req, res) {
+//   try {
+//     const { firstName, cardholderName, email, expMonth, expYear } = req.body;
+//     const findUser = await Users.findOne({ Email: email });
+//     if (!findUser) {
+//       return res.json({
+//         status: false,
+//         message: "No user found against this email",
+//         data: null
+//       })
+//     }
+//     if (findUser?.Square_App_Data_Customer) {
+//       const findSuqareCustomer = await client.customers.get({
+//         customerId: findUser?.Square_App_Data_Customer?.id,
+//       });
+//       if (findSuqareCustomer) {
+//         return res.json({
+//           status: true,
+//           message: "Customer already registered",
+//           data: findUser?.Square_App_Data_Customer?.id
+//         })
+//       }
+//     }
 
-    console.log('Customer created:', response.result);
-  } catch (error) {
-    if (error instanceof SquareError) {
-      console.error("Error occurred: " + error.message);
-    } else {
-      console.error("Unexpected error occurred: ", error);
-    }
-  }
-};
+//     const response = await client.customers.create({
+//       idempotencyKey: uuidv4(),
+//       emailAddress: email,
+//       companyName: firstName
+//     });
+//     if (response) {
+//       //findUser.Square_App_Data_Customer = response?.customer;
+//       //await findUser.save();
+
+//       const cardData = await client.cards.create({
+//         sourceId: "cnon:card-nonce-ok",
+//         card: {
+//             cardholderName: cardholderName,
+//             customerId: response?.customer?.id,
+//             expMonth: BigInt(expMonth),
+//             expYear: BigInt(expYear),
+//         },
+//         idempotencyKey: uuidv4(),
+//       });
+//       if(cardData){
+//        // findUser.Square_App_Data_Card = cardData?.card;
+//        // await findUser.save();
+//       }
+//     }
+//     return res.json({
+//       status: true,
+//       message: "Customer registered",
+//       data: response?.customer?.id
+//     })
+
+//     // console.log('Customer created:', response.result);
+//   } catch (error) {
+//     if (error instanceof SquareError) {
+//       console.error("Error occurred: " + error.message);
+//     } else {
+//       console.error("Unexpected error occurred: ", error);
+//     }
+//   }
+// };
