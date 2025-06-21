@@ -96,5 +96,5 @@ function startInterval() {
   });
 }
 
-//startInterval();
+startInterval();
 
