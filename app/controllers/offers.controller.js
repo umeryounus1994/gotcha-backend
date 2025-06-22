@@ -395,6 +395,8 @@ exports.holdOffer = async function (req, res) {
     }
     findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
     findCoins.save();
+    offerData.Location = location;
+    offerData.save();
     // Send success response
     return res.json({
       success: true,
@@ -413,6 +415,8 @@ exports.holdOffer = async function (req, res) {
     findClaimedOffer.save();
     findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
     findCoins.save();
+    offerData.Location = location;
+    offerData.save();
     return res.json({
       success: true,
       message: 'Offer successfully held!',
