@@ -74,10 +74,11 @@ exports.add = function (req, res) {
   });
 };
 
-exports.list = function (req, res) {
+exports.list = async function (req, res) {
   deleteExpired();
 
   var lastId = req.query.id;
+  var UserId = req.query.UserId;
   var query = {};
   const pageSize = 500;
   if (lastId) {
@@ -86,6 +87,14 @@ exports.list = function (req, res) {
   var selection = {
     __v: 0,
   };
+  let findCoins = await UserCoins.findOne({ UserId: UserId });
+  if (!findCoins || findCoins?.HeldCoins < 200000) {
+    return res.json({
+      success: false,
+      message: 'Not enough coins to teleport',
+      data: null,
+    });
+  }
 
   Offers.find(query, selection, function (err, data) {
     if (err) {
@@ -95,6 +104,8 @@ exports.list = function (req, res) {
         data: err,
       });
     } else {
+      findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
+      findCoins.save();
       res.json({
         success: true,
         message: data.length + ' Records Found.',
