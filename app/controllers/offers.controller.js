@@ -104,8 +104,7 @@ exports.list = async function (req, res) {
         data: err,
       });
     } else {
-      findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
-      findCoins.save();
+      
       res.json({
         success: true,
         message: data.length + ' Records Found.',
@@ -559,6 +558,15 @@ exports.get = async function (req, res) {
   var lng = req.body.longitude;
   var distance = parseInt(req.body.distance);
 
+  let findCoins = await UserCoins.findOne({ UserId: userId });
+  if (!findCoins || findCoins?.HeldCoins < 200000) {
+    return res.json({
+      success: false,
+      message: 'Not enough coins',
+      data: null,
+    });
+  }
+
   //console.log("lat ",lat, ' lng: ', lng, ' distance: ',distance, ' userId: ',userId)
   // let currentLocation = {
   //   type: 'Point',
@@ -620,6 +628,9 @@ exports.get = async function (req, res) {
   if (offersList.length == 0) {
     msg = 'No Offers Found';
   } else {
+    
+    findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
+    findCoins.save();
     msg = offersList.length + ' Offers Found.';
   }
 
