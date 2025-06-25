@@ -275,7 +275,7 @@ exports.claimed = function (req, res) {
 exports.holdOffer = async function (req, res) {
   var OfferId = req.body.OfferId;
   var UserId = req.body.UserId;
-  // let findCoins = await UserCoins.findOne({ UserId: UserId });
+   let findCoins = await UserCoins.findOne({ UserId: UserId });
   // if (!findCoins || findCoins?.HeldCoins < 200000) {
   //   return res.json({
   //     success: false,
@@ -316,8 +316,10 @@ exports.holdOffer = async function (req, res) {
       if (findOffersClaimedModel) {
         findOffersClaimedModel.Status = "requested";
         findOffersClaimedModel.save();
-       // findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
-        //findCoins.save();
+        if (findCoins && findCoins?.HeldCoins > 200000) {
+          findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
+          findCoins.save();
+        }
       }
       res.json({
         success: false,
