@@ -275,14 +275,14 @@ exports.claimed = function (req, res) {
 exports.holdOffer = async function (req, res) {
   var OfferId = req.body.OfferId;
   var UserId = req.body.UserId;
-  let findCoins = await UserCoins.findOne({ UserId: UserId });
-  if (!findCoins || findCoins?.HeldCoins < 200000) {
-    return res.json({
-      success: false,
-      message: 'Not enough coins to plant this offer',
-      data: null,
-    });
-  }
+  // let findCoins = await UserCoins.findOne({ UserId: UserId });
+  // if (!findCoins || findCoins?.HeldCoins < 200000) {
+  //   return res.json({
+  //     success: false,
+  //     message: 'Not enough coins to plant this offer',
+  //     data: null,
+  //   });
+  // }
 
   // let heldOfferUser = await OffersHeld.findOne({ OfferId: OfferId, UserId: UserId, Status: 'pending' });
   // if(heldOfferUser){
@@ -316,8 +316,8 @@ exports.holdOffer = async function (req, res) {
       if (findOffersClaimedModel) {
         findOffersClaimedModel.Status = "requested";
         findOffersClaimedModel.save();
-        findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
-        findCoins.save();
+       // findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
+        //findCoins.save();
       }
       res.json({
         success: false,
@@ -403,8 +403,8 @@ exports.holdOffer = async function (req, res) {
       findClaimedOffer.HeldType = req.body.HeldType;
       findClaimedOffer.save();
     }
-    findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
-    findCoins.save();
+   // findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
+    //findCoins.save();
     offerData.Location = location;
     offerData.save();
     // Send success response
@@ -423,8 +423,8 @@ exports.holdOffer = async function (req, res) {
     findClaimedOffer.Status = 'pending';
     findClaimedOffer.HeldType = req.body.HeldType;
     findClaimedOffer.save();
-    findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
-    findCoins.save();
+  //  findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
+   // findCoins.save();
     offerData.Location = location;
     offerData.save();
     return res.json({
@@ -691,7 +691,7 @@ exports.get = async function (req, res) {
   //       data.forEach((element)=>{
   //         let endLocation = {
   //           latitude: element.Location.coordinates[1],
-  //           longitude: element.Location.coordinates[0]
+  //           longitude: element.LocaholdOffertion.coordinates[0]
   //       }
   //       console.log("endLocation ", endLocation)
   //       const locationDistance = haversine(userLocation, endLocation, { unit: 'meter' })
