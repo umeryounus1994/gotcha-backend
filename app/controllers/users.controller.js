@@ -3,6 +3,7 @@ let UserCoins = require("../models/user-coins.model");
 let Offers = require("../models/offers.model");
 let OffersClaimedModel = require('../models/offer-claimed.model');
 const PackagesModel = require("../models/packages.model");
+const UserCards = require("../models/user-card.model");
 
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
@@ -15,15 +16,11 @@ const moment = require('moment')
 const momenttz = require('moment-timezone');
 
 momenttz.tz.setDefault('Australia/Brisbane');
+const fetch = require('node-fetch');
+const CryptoJS = require('crypto-js');
 
 const { v4: uuidv4 } = require('uuid');
 
-// const { SquareClient, SquareEnvironment, SquareError } = require("square");
-
-// const client = new SquareClient({
-//   token: "EAAAl7C7rQPXu_QbyFhfYvWqTiM_r0fgZl0JMzTp8CI1OhGMF64pAbnsXTggItqB",
-//   environment: SquareEnvironment.Production,
-// });
 
 // Login:
 exports.login = function (req, res) {
@@ -995,6 +992,209 @@ exports.remainingCoins = async function (req, res) {
 
 };
 
+exports.hellotest = async function(req,res){
+  const {
+    amount,
+    pmt_numb,
+    exp_mm,
+    exp_yy,
+    pmt_key,
+    cust_email,
+    cust_fname,
+    cust_lname,
+    cust_phone
+  } = req.body;
+
+  const missingFields = [];
+
+  if (!amount) missingFields.push("amount");
+  if (!pmt_numb) missingFields.push("pmt_numb");
+  if (!exp_mm) missingFields.push("exp_mm");
+  if (!exp_yy) missingFields.push("exp_yy");
+  if (!pmt_key) missingFields.push("pmt_key");
+  if (!cust_email) missingFields.push("cust_email");
+  if (!cust_fname) missingFields.push("cust_fname");
+  if (!cust_phone) missingFields.push("cust_phone");
+
+  if (missingFields.length > 0) {
+    return res.status(400).json({
+      success: false,
+      message: `Missing mandatory fields: ${missingFields.join(', ')}`
+    });
+  }
+
+  const payload = {
+    request_action: "CCAUTHCAP",
+    amount: amount,
+    request_currency: "AUD",
+    pmt_numb: pmt_numb,
+    exp_mm: exp_mm,
+    exp_yy: exp_yy,
+    pmt_key: pmt_key,
+    cust_email: cust_email,
+    cust_fname: cust_fname,
+    cust_lname: cust_lname,
+    cust_phone: cust_phone,
+    req_username: process.env.BANKFUL_USERNAME,
+    req_password: process.env.BANKFUL_PASSWORD,
+    xtl_order_id: generateOrderId()
+  };
+  
+  // Generate signature
+  const salt = payload.req_password;
+  const sortedKeys = Object.keys(payload).sort();
+  
+  const payloadString = sortedKeys
+    .filter(key => key !== "signature")
+    .filter(key => payload[key] !== undefined && payload[key] !== null && payload[key] !== "")
+    .map(key => `${key}${payload[key]}`)
+    .join("");
+  
+  const signature = CryptoJS.HmacSHA256(payloadString, salt).toString();
+  payload.signature = signature;
+  
+  // Convert payload to x-www-form-urlencoded string
+  const formBody = Object.entries(payload)
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join('&');
+  
+  // Final Fetch Call
+  fetch('https://api-dev1.bankfulportal.com/api/transaction/api', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'cache-control': 'no-cache'
+    },
+    body: formBody
+  })
+    .then(res => res.json())
+    .then(response => {
+      return res.json({
+        status: true,
+        message: "Amount Paid",
+        data: response
+      })
+    })
+    .catch(err => {
+      return res.status(400).json({
+        success: false,
+        message: err
+      });
+    });
+}
+
+exports.addCard = async function (req, res) {
+  const {
+    pmt_numb,
+    exp_mm,
+    exp_yy,
+    pmt_key,
+    cust_email,
+    cust_fname,
+    cust_lname,
+    cust_phone,
+    city,
+    address_1,
+    UserId
+  } = req.body;
+
+  const missingFields = [];
+
+  if (!pmt_numb) missingFields.push("pmt_numb");
+  if (!exp_mm) missingFields.push("exp_mm");
+  if (!exp_yy) missingFields.push("exp_yy");
+  if (!pmt_key) missingFields.push("pmt_key");
+  if (!cust_email) missingFields.push("cust_email");
+  if (!cust_fname) missingFields.push("cust_fname");
+  if (!cust_lname) missingFields.push("cust_lname");
+  if (!city) missingFields.push("city");
+  if (!address_1) missingFields.push("address_1");
+
+  if (missingFields.length > 0) {
+    return res.status(400).json({
+      success: false,
+      message: `Missing mandatory fields: ${missingFields.join(', ')}`
+    });
+  }
+  const formBodyData = {
+    req_username: process.env.BANKFUL_USERNAME,
+    req_password: process.env.BANKFUL_PASSWORD,
+    customer_details: {
+      first_name: cust_fname,
+      last_name: cust_lname,
+      email: cust_email,
+      phone: cust_phone,
+      address_1: address_1,
+      city: city
+    },
+    card_details: {
+      card_number: pmt_numb,
+      card_exp_mm: exp_mm,
+      card_exp_yy: exp_yy,
+      card_cvv: pmt_key
+    }
+  };
+
+  fetch('https://api-dev1.bankfulportal.com/api/integration/customer/card-tokenization', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'cache-control': 'no-cache'
+    },
+    body: JSON.stringify(formBodyData)
+  })
+    .then(res => res.json())
+    .then(async response => {
+      try {
+        console.log(response?.data)
+        const card = new UserCards({
+          pmt_numb: pmt_numb,
+          exp_mm: parseInt(exp_mm, 10),
+          exp_yy: parseInt(exp_yy, 10),
+          pmt_key: pmt_key || null,
+          cust_phone: cust_phone,
+          cust_email: cust_email || "",
+          cust_fname: cust_fname,
+          cust_lname: cust_lname,
+          city: city,
+          address_1: address_1,
+          UserId: UserId,
+          customer_id: response?.data?.customer_id,
+          customer_vault_idmes: response?.data?.customer_vault_id ? response?.data?.customer_vault_id : response?.data?.customer_vault_idmes
+        });
+        await card.save();
+        return res.status(200).json({
+          success: true,
+          message: 'Card Saved Successfully'
+        });
+      } catch (error) {
+        return res.status(400).json({
+          success: true,
+          message: error
+        });
+      }
+    })
+    .catch(err => {
+      return res.status(400).json({
+        success: false,
+        message: err
+      });
+    });
+
+
+};
+
+exports.getUserCards = async function (req, res) {
+  var UserId = req.body.UserId;
+  var userCards = await UserCards.find({ UserId: UserId });
+  res.json({
+    success: true,
+    message: 'User Cards',
+    data: userCards,
+  });
+
+};
+
 exports.getCoins = async function (req, res) {
   var Email = req.body.Email;
 
@@ -1063,66 +1263,8 @@ exports.getCoins = async function (req, res) {
   }
 };
 
-// exports.registerSquareCustomer = async function (req, res) {
-//   try {
-//     const { firstName, cardholderName, email, expMonth, expYear } = req.body;
-//     const findUser = await Users.findOne({ Email: email });
-//     if (!findUser) {
-//       return res.json({
-//         status: false,
-//         message: "No user found against this email",
-//         data: null
-//       })
-//     }
-//     if (findUser?.Square_App_Data_Customer) {
-//       const findSuqareCustomer = await client.customers.get({
-//         customerId: findUser?.Square_App_Data_Customer?.id,
-//       });
-//       if (findSuqareCustomer) {
-//         return res.json({
-//           status: true,
-//           message: "Customer already registered",
-//           data: findUser?.Square_App_Data_Customer?.id
-//         })
-//       }
-//     }
-
-//     const response = await client.customers.create({
-//       idempotencyKey: uuidv4(),
-//       emailAddress: email,
-//       companyName: firstName
-//     });
-//     if (response) {
-//       //findUser.Square_App_Data_Customer = response?.customer;
-//       //await findUser.save();
-
-//       const cardData = await client.cards.create({
-//         sourceId: "cnon:card-nonce-ok",
-//         card: {
-//             cardholderName: cardholderName,
-//             customerId: response?.customer?.id,
-//             expMonth: BigInt(expMonth),
-//             expYear: BigInt(expYear),
-//         },
-//         idempotencyKey: uuidv4(),
-//       });
-//       if(cardData){
-//        // findUser.Square_App_Data_Card = cardData?.card;
-//        // await findUser.save();
-//       }
-//     }
-//     return res.json({
-//       status: true,
-//       message: "Customer registered",
-//       data: response?.customer?.id
-//     })
-
-//     // console.log('Customer created:', response.result);
-//   } catch (error) {
-//     if (error instanceof SquareError) {
-//       console.error("Error occurred: " + error.message);
-//     } else {
-//       console.error("Unexpected error occurred: ", error);
-//     }
-//   }
-// };
+function generateOrderId() {
+  const digits = Math.floor(100000 + Math.random() * 900000); // 6-digit number
+  const letter = String.fromCharCode(65 + Math.floor(Math.random() * 26)); // A-Z
+  return `${digits}${letter}`;
+}

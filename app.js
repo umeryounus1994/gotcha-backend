@@ -5,10 +5,8 @@ let path = require("path");
 var cookieParser = require('cookie-parser');
 let cors = require("cors");
 let Constants = require("./app/app.constants");
-let Token = require("./app/token");
 var logger = require('morgan');
 var multer = require('multer');
-var upload = multer();
 var OffersHeld = require('./app/models/offer-held.model.js');
 var OffersClaimedModel = require('./app/models/offer-claimed.model.js');
 var moment = require('moment'); // require
@@ -96,5 +94,5 @@ function startInterval() {
   });
 }
 
-startInterval();
+//startInterval();
 

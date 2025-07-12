@@ -648,6 +648,11 @@ router.route("/offers/remaining-offer-time").post(offersController.remainingOffe
 router.route("/users/watchAddTeleport").post(usersController.saveWatchadCoins);
 router.route("/users/remaining-coins").post(usersController.remainingCoins);
 
+router.route("/users/add-card").post(usersController.addCard);
+router.route("/users/get-user-cards").post(usersController.getUserCards);
+
+router.route('/users/hello-transactions').post(usersController.hellotest);
+
 
 // router.route("/users/register-square-customer").post(usersController.registerSquareCustomer);
 
