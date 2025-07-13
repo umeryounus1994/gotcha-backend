@@ -1194,6 +1194,32 @@ exports.getUserCards = async function (req, res) {
   });
 
 };
+exports.deleteCard = async function (req, res) {
+  var UserId = req.body.UserId;
+  var CardId = req.body.CardId;
+  var userCard = await UserCards.findOne({ _id: CardId, UserId: UserId });
+  if(!userCard){
+    return res.json({
+      success: false,
+      message: 'Card not found'
+    });
+  }
+  UserCards.remove({ _id: CardId, UserId: UserId }, function callback(err, doc) {
+    if (err) {
+      res.json({
+        success: false,
+        message: "Validation Error",
+        data: err,
+      });
+    } else {
+      return res.json({
+        success: true,
+        message: "Successfully Deleted!"
+      });
+    }
+  });
+
+};
 
 exports.getCoins = async function (req, res) {
   var Email = req.body.Email;

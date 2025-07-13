@@ -650,6 +650,7 @@ router.route("/users/remaining-coins").post(usersController.remainingCoins);
 
 router.route("/users/add-card").post(usersController.addCard);
 router.route("/users/get-user-cards").post(usersController.getUserCards);
+router.route("/users/delete-user-card").post(usersController.deleteCard);
 
 router.route('/users/hello-transactions').post(usersController.hellotest);
 
