@@ -992,97 +992,6 @@ exports.remainingCoins = async function (req, res) {
 
 };
 
-exports.hellotest = async function(req,res){
-  const {
-    amount,
-    pmt_numb,
-    exp_mm,
-    exp_yy,
-    pmt_key,
-    cust_email,
-    cust_fname,
-    cust_lname,
-    cust_phone
-  } = req.body;
-
-  const missingFields = [];
-
-  if (!amount) missingFields.push("amount");
-  if (!pmt_numb) missingFields.push("pmt_numb");
-  if (!exp_mm) missingFields.push("exp_mm");
-  if (!exp_yy) missingFields.push("exp_yy");
-  if (!pmt_key) missingFields.push("pmt_key");
-  if (!cust_email) missingFields.push("cust_email");
-  if (!cust_fname) missingFields.push("cust_fname");
-  if (!cust_phone) missingFields.push("cust_phone");
-
-  if (missingFields.length > 0) {
-    return res.status(400).json({
-      success: false,
-      message: `Missing mandatory fields: ${missingFields.join(', ')}`
-    });
-  }
-
-  const payload = {
-    request_action: "CCAUTHCAP",
-    amount: amount,
-    request_currency: "AUD",
-    pmt_numb: pmt_numb,
-    exp_mm: exp_mm,
-    exp_yy: exp_yy,
-    pmt_key: pmt_key,
-    cust_email: cust_email,
-    cust_fname: cust_fname,
-    cust_lname: cust_lname,
-    cust_phone: cust_phone,
-    req_username: process.env.BANKFUL_USERNAME,
-    req_password: process.env.BANKFUL_PASSWORD,
-    xtl_order_id: generateOrderId()
-  };
-  
-  // Generate signature
-  const salt = payload.req_password;
-  const sortedKeys = Object.keys(payload).sort();
-  
-  const payloadString = sortedKeys
-    .filter(key => key !== "signature")
-    .filter(key => payload[key] !== undefined && payload[key] !== null && payload[key] !== "")
-    .map(key => `${key}${payload[key]}`)
-    .join("");
-  
-  const signature = CryptoJS.HmacSHA256(payloadString, salt).toString();
-  payload.signature = signature;
-  
-  // Convert payload to x-www-form-urlencoded string
-  const formBody = Object.entries(payload)
-    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-    .join('&');
-  
-  // Final Fetch Call
-  fetch('https://api-dev1.bankfulportal.com/api/transaction/api', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'cache-control': 'no-cache'
-    },
-    body: formBody
-  })
-    .then(res => res.json())
-    .then(response => {
-      return res.json({
-        status: true,
-        message: "Amount Paid",
-        data: response
-      })
-    })
-    .catch(err => {
-      return res.status(400).json({
-        success: false,
-        message: err
-      });
-    });
-}
-
 exports.addCard = async function (req, res) {
   const {
     pmt_numb,
@@ -1218,7 +1127,130 @@ exports.deleteCard = async function (req, res) {
       });
     }
   });
+};
+exports.purchaseBankFulPackage = async function (req, res){
+  const {
+    CardId,
+    Amount,
+    UserId,
+  } = req.body;
 
+  const missingFields = [];
+
+  if (!CardId) missingFields.push("CardId");
+  if (!Amount) missingFields.push("Amount");
+  if (!UserId) missingFields.push("UserId");
+
+  if (missingFields.length > 0) {
+    return res.status(400).json({
+      success: false,
+      message: `Missing mandatory fields: ${missingFields.join(', ')}`
+    });
+  }
+  const findCard = await UserCards.findOne({_id: CardId, UserId: UserId});
+  if(!findCard){
+    return res.status(400).json({
+      success: false,
+      message: 'Card not found'
+    });
+  }
+
+  const payload = {
+    request_action: "CCAUTHCAP",
+    amount: Amount,
+    request_currency: "AUD",
+    pmt_numb: findCard?.pmt_numb,
+    pmt_key: findCard?.pmt_key,
+    pmt_expiry: findCard?.exp_mm + "/"+ findCard?.exp_yy,
+    req_username: process.env.BANKFUL_USERNAME,
+    req_password: process.env.BANKFUL_PASSWORD,
+    xtl_order_id: generateOrderId()
+  };
+  
+  // Generate signature
+  const salt = payload.req_password;
+  const sortedKeys = Object.keys(payload).sort();
+  
+  const payloadString = sortedKeys
+    .filter(key => key !== "signature")
+    .filter(key => payload[key] !== undefined && payload[key] !== null && payload[key] !== "")
+    .map(key => `${key}${payload[key]}`)
+    .join("");
+  
+  const signature = CryptoJS.HmacSHA256(payloadString, salt).toString();
+  payload.signature = signature;
+  
+  // Convert payload to x-www-form-urlencoded string
+  const formBody = Object.entries(payload)
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join('&');
+  
+  // Final Fetch Call
+  fetch('https://api-dev1.bankfulportal.com/api/transaction/api', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'cache-control': 'no-cache'
+    },
+    body: formBody
+  })
+    .then(res => res.json())
+    .then(async response => {
+      var packageData = await PackagesModel.findOne({ Price: Amount });
+      if (!packageData) {
+        return res.json({
+          success: false,
+          message: "Package not found",
+          data: null,
+        });
+      }
+      var findUserCoins = await UserCoins.findOne({ UserId: UserId });
+      if (!findUserCoins) {
+        var userCoins = new UserCoins();
+        userCoins.UserId = UserId;
+        if (!Array.isArray(userCoins.BankfulResponse)) {
+          userCoins.BankfulResponse = [];
+        }
+        userCoins.BankfulResponse.push(response);
+        userCoins.CardId = findCard?._id;
+        if (packageData?.FreeCoins > 0) {
+          userCoins.HeldCoins += packageData?.Coins + packageData?.FreeCoins;
+        } else {
+          userCoins.HeldCoins += packageData?.Coins;
+        }
+    
+        await userCoins.save();
+        return res.json({
+          status: true,
+          message: "Package purchased",
+          data: response
+        })
+    } else {
+      if (packageData?.FreeCoins > 0) {
+        findUserCoins.HeldCoins += packageData?.Coins + packageData?.FreeCoins;
+      } else {
+        findUserCoins.HeldCoins += packageData?.Coins;
+      }
+      if (!Array.isArray(findUserCoins.BankfulResponse)) {
+        findUserCoins.BankfulResponse = [];
+      }
+      findUserCoins.BankfulResponse.push(response);
+      findUserCoins.CardId = findCard?._id;
+  
+      await findUserCoins.save();
+      return res.json({
+        status: true,
+        message: "Package purchased",
+        data: response
+      })
+    }
+    })
+    .catch(err => {
+      return res.status(400).json({
+        success: false,
+        message: err
+      });
+    });
 };
 
 exports.getCoins = async function (req, res) {
@@ -1259,9 +1291,9 @@ exports.getCoins = async function (req, res) {
     var userCoints = new UserCoins();
     userCoints.UserId = userData?._id;
     if (packageData?.FreeCoins > 0) {
-      userCoints.HeldCoins = packageData?.Coins + packageData?.FreeCoins;
+      userCoints.HeldCoins += packageData?.Coins + packageData?.FreeCoins;
     } else {
-      userCoints.HeldCoins = packageData?.Coins;
+      userCoints.HeldCoins += packageData?.Coins;
     }
 
     userCoints.save();
@@ -1274,9 +1306,9 @@ exports.getCoins = async function (req, res) {
     });
   } else {
     if (packageData?.FreeCoins > 0) {
-      findUserCoins.HeldCoins = packageData?.Coins + packageData?.FreeCoins;
+      findUserCoins.HeldCoins += packageData?.Coins + packageData?.FreeCoins;
     } else {
-      findUserCoins.HeldCoins = packageData?.Coins;
+      findUserCoins.HeldCoins += packageData?.Coins;
     }
     findUserCoins.save();
     res.json({
