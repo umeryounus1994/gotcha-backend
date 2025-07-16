@@ -1044,7 +1044,7 @@ exports.addCard = async function (req, res) {
     }
   };
 
-  fetch('https://api-dev1.bankfulportal.com/api/integration/customer/card-tokenization', {
+  fetch(`${process.env.BANKFUL_URL}/api/integration/customer/card-tokenization`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -1055,7 +1055,12 @@ exports.addCard = async function (req, res) {
     .then(res => res.json())
     .then(async response => {
       try {
-        console.log(response?.data)
+        if(response?.status == 'Failed'){
+          return res.json({
+            success: false,
+            message: response?.errorMessage
+          });
+        }
         const card = new UserCards({
           pmt_numb: pmt_numb,
           exp_mm: parseInt(exp_mm, 10),
@@ -1186,7 +1191,7 @@ exports.purchaseBankFulPackage = async function (req, res){
     .join('&');
   
   // Final Fetch Call
-  fetch('https://api-dev1.bankfulportal.com/api/transaction/api', {
+  fetch(`${process.env.BANKFUL_URL}/api/transaction/api`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -1196,6 +1201,13 @@ exports.purchaseBankFulPackage = async function (req, res){
   })
     .then(res => res.json())
     .then(async response => {
+      if(response && response?.TRANS_STATUS_NAME == 'DECLINED'){
+        return res.json({
+          status: false,
+          message: "Error in purchasing package",
+          data: response
+        })
+      }
       var packageData = await PackagesModel.findOne({ Price: Amount });
       if (!packageData) {
         return res.json({
