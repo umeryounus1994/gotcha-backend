@@ -114,8 +114,7 @@ const userSchema = new schema({
     type: Date,
     default: Date.now,
   },
-  Square_App_Data_Customer : {type: Object},
-  Square_App_Data_Card : {type: Object}
+  SquareCustomerId : {type: String}
 });
 
 

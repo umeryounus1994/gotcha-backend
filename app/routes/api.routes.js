@@ -9,6 +9,13 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
+const { SquareClient, SquareEnvironment, SquareError } = require("square");
+const client = new SquareClient({
+  token: 'EAAAl1euQKyKUNUZ-S7ZsiOmBb4BDHPJJaQ9o-y1Qkl6OGvwvvsjfGiGeJq6RoSm',
+  environment: SquareEnvironment.Sandbox,
+});
+const { v4: uuidv4 } = require('uuid');
+
 //const adminController = require('../controllers/admin.controller');
 const offerTypesController = require("../controllers/offer-types.controller");
 const markerTypesController = require("../controllers/marker-types.controller");
@@ -440,7 +447,7 @@ async function (req, res) {
           user.PackageDate = req.body.PackageDate || "",
           user.PackageExpiryDate = req.body.PackageExpiryDate || ""
 
-          user.save(function (err) {
+          user.save(async function (err) {
             if (err) {
               res.json({
                 success: false,
@@ -448,6 +455,13 @@ async function (req, res) {
                 data: err,
               });
             } else {
+              const customer = await client.customers.create({
+                idempotencyKey: uuidv4(),
+                emailAddress: req.body.Email.toLowerCase().trim()
+              });
+              if (customer?.customer?.id) {
+                usersController.updateUserProfile(user._id, {SquareCustomerId: customer?.customer?.id}, {new: true}, async function (err, result) {});
+              }
               let userData = {
                 Id: user._id,
                 Name: user.FullName,
@@ -656,6 +670,7 @@ router.route('/users/purchase-user-package').post(usersController.purchaseBankFu
 
 
 // router.route("/users/register-square-customer").post(usersController.registerSquareCustomer);
+router.route("/users/register-customer").post(usersController.registerCustomer);
 
 module.exports = {
   apiRoutes: router,

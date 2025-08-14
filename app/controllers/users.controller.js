@@ -19,19 +19,33 @@ momenttz.tz.setDefault('Australia/Brisbane');
 const fetch = require('node-fetch');
 const CryptoJS = require('crypto-js');
 
+const { SquareClient, SquareEnvironment, SquareError } = require("square");
+const client = new SquareClient({
+  token: process.env.SQ_ACCESS_TOKEN,
+  environment: SquareEnvironment.Sandbox,
+});
 const { v4: uuidv4 } = require('uuid');
-
 
 // Login:
 exports.login = function (req, res) {
   var Email = req.body.Email;
   var Password = req.body.Password;
 
-  Users.findOne({ Email: Email.toLowerCase().trim() }, function (err, user) {
+  Users.findOne({ Email: Email.toLowerCase().trim() }, async function (err, user) {
     if (err) res.send(err);
     else {
       if (user) {
         var userPassword = user.Password;
+        if(user && !user?.SquareCustomerId){
+          const customer = await client.customers.create({
+            idempotencyKey: uuidv4(),
+            emailAddress: Email.toLowerCase().trim()
+          });
+          if (customer?.customer?.id) {
+            var query = { _id: user?._id };
+            await Users.findOneAndUpdate(query, {SquareCustomerId: customer?.customer?.id}, {new: true}, async function (err, result) {});
+          }
+        }
 
         bcrypt.compare(Password, userPassword, async function (err, matched) {
           if (matched) {
@@ -994,30 +1008,26 @@ exports.remainingCoins = async function (req, res) {
 
 exports.addCard = async function (req, res) {
   const {
-    pmt_numb,
-    exp_mm,
-    exp_yy,
-    pmt_key,
-    cust_email,
-    cust_fname,
-    cust_lname,
-    cust_phone,
-    city,
-    address_1,
-    UserId
+    cardholderName,
+    expMonth,
+    expYear,
+    addressLine1,
+    addressLine2,
+    country,
+    postalCode,
+    userId
   } = req.body;
 
   const missingFields = [];
 
-  if (!pmt_numb) missingFields.push("pmt_numb");
-  if (!exp_mm) missingFields.push("exp_mm");
-  if (!exp_yy) missingFields.push("exp_yy");
-  if (!pmt_key) missingFields.push("pmt_key");
-  if (!cust_email) missingFields.push("cust_email");
-  if (!cust_fname) missingFields.push("cust_fname");
-  if (!cust_lname) missingFields.push("cust_lname");
-  if (!city) missingFields.push("city");
-  if (!address_1) missingFields.push("address_1");
+  if (!cardholderName) missingFields.push("cardholderName");
+  if (!expMonth) missingFields.push("expMonth");
+  if (!expYear) missingFields.push("expYear");
+  if (!addressLine1) missingFields.push("addressLine1");
+  if (!addressLine2) missingFields.push("addressLine2");
+  if (!country) missingFields.push("country");
+  if (!postalCode) missingFields.push("postalCode");
+  if (!userId) missingFields.push("UserId");
 
   if (missingFields.length > 0) {
     return res.status(400).json({
@@ -1025,75 +1035,107 @@ exports.addCard = async function (req, res) {
       message: `Missing mandatory fields: ${missingFields.join(', ')}`
     });
   }
-  const formBodyData = {
-    req_username: process.env.BANKFUL_USERNAME,
-    req_password: process.env.BANKFUL_PASSWORD,
-    customer_details: {
-      first_name: cust_fname,
-      last_name: cust_lname,
-      email: cust_email,
-      phone: cust_phone,
-      address_1: address_1,
-      city: city
-    },
-    card_details: {
-      card_number: pmt_numb,
-      card_exp_mm: exp_mm,
-      card_exp_yy: exp_yy,
-      card_cvv: pmt_key
-    }
-  };
-
-  fetch(`${process.env.BANKFUL_URL}/api/integration/customer/card-tokenization`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'cache-control': 'no-cache'
-    },
-    body: JSON.stringify(formBodyData)
-  })
-    .then(res => res.json())
-    .then(async response => {
-      try {
-        if(response?.status == 'Failed'){
-          return res.json({
-            success: false,
-            message: response?.errorMessage
-          });
-        }
-        const card = new UserCards({
-          pmt_numb: pmt_numb,
-          exp_mm: parseInt(exp_mm, 10),
-          exp_yy: parseInt(exp_yy, 10),
-          pmt_key: pmt_key || null,
-          cust_phone: cust_phone,
-          cust_email: cust_email || "",
-          cust_fname: cust_fname,
-          cust_lname: cust_lname,
-          city: city,
-          address_1: address_1,
-          UserId: UserId,
-          customer_id: response?.data?.customer_id,
-          customer_vault_idmes: response?.data?.customer_vault_id ? response?.data?.customer_vault_id : response?.data?.customer_vault_idmes
-        });
-        await card.save();
-        return res.status(200).json({
-          success: true,
-          message: 'Card Saved Successfully'
-        });
-      } catch (error) {
-        return res.status(400).json({
-          success: true,
-          message: error
-        });
-      }
-    })
-    .catch(err => {
-      return res.status(400).json({
-        success: false,
-        message: err
-      });
+  const getUser = await Users.findOne({ _id: userId });
+  if (!getUser) {
+    return res.status(400).json({
+      success: false,
+      message: `No user found`
     });
+  }
+  const cards = await client.cards.create({
+    card: {
+      cardholderName: cardholderName,
+      customerId: getUser?.SquareCustomerId,
+      expMonth: BigInt(expMonth, 10),
+      expYear: BigInt(expYear, 10),
+      billingAddress: {
+        addressLine1: addressLine1,
+        addressLine2: addressLine2,
+        postalCode: postalCode,
+        country: country,
+      },
+    },
+    idempotencyKey: uuidv4(),
+    sourceId: "cnon:card-nonce-ok",
+  });
+  try {
+    const card = new UserCards({
+      cardholderName: cardholderName,
+      expMonth: parseInt(expMonth, 10),
+      expYear: parseInt(expYear, 10),
+      billingAddress: {
+        addressLine1: addressLine1,
+        addressLine2: addressLine2,
+        postalCode: postalCode,
+        country: country,
+      },
+      cardDetails: cards?.card,
+      userId: getUser,
+      cardId: cards?.card?.id
+    });
+    await card.save();
+    return res.status(200).json({
+      success: true,
+      message: 'Card Saved Successfully'
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: true,
+      message: error
+    });
+  }
+  //return;
+
+  // fetch(`${process.env.BANKFUL_URL}/api/integration/customer/card-tokenization`, {
+  //   method: 'POST',
+  //   headers: {
+  //     'Content-Type': 'application/json',
+  //     'cache-control': 'no-cache'
+  //   },
+  //   body: JSON.stringify(formBodyData)
+  // })
+  //   .then(res => res.json())
+  //   .then(async response => {
+  //     try {
+  //       if(response?.status == 'Failed'){
+  //         return res.json({
+  //           success: false,
+  //           message: response?.errorMessage
+  //         });
+  //       }
+  //       const card = new UserCards({
+  //         pmt_numb: pmt_numb,
+  //         exp_mm: parseInt(exp_mm, 10),
+  //         exp_yy: parseInt(exp_yy, 10),
+  //         pmt_key: pmt_key || null,
+  //         cust_phone: cust_phone,
+  //         cust_email: cust_email || "",
+  //         cust_fname: cust_fname,
+  //         cust_lname: cust_lname,
+  //         city: city,
+  //         address_1: address_1,
+  //         UserId: UserId,
+  //         customer_id: response?.data?.customer_id,
+  //         customer_vault_idmes: response?.data?.customer_vault_id ? response?.data?.customer_vault_id : response?.data?.customer_vault_idmes
+  //       });
+  //       await card.save();
+  //       return res.status(200).json({
+  //         success: true,
+  //         message: 'Card Saved Successfully'
+  //       });
+  //     } catch (error) {
+  //       return res.status(400).json({
+  //         success: true,
+  //         message: error
+  //       });
+  //     }
+  //   })
+  //   .catch(err => {
+  //     return res.status(400).json({
+  //       success: false,
+  //       message: err
+  //     });
+  //   });
 
 
 };
@@ -1112,7 +1154,7 @@ exports.deleteCard = async function (req, res) {
   var UserId = req.body.UserId;
   var CardId = req.body.CardId;
   var userCard = await UserCards.findOne({ _id: CardId, UserId: UserId });
-  if(!userCard){
+  if (!userCard) {
     return res.json({
       success: false,
       message: 'Card not found'
@@ -1133,18 +1175,18 @@ exports.deleteCard = async function (req, res) {
     }
   });
 };
-exports.purchaseBankFulPackage = async function (req, res){
+exports.purchaseBankFulPackage = async function (req, res) {
   const {
-    CardId,
-    Amount,
-    UserId,
+    sourceId,
+    amount,
+    userId,
   } = req.body;
 
   const missingFields = [];
 
-  if (!CardId) missingFields.push("CardId");
-  if (!Amount) missingFields.push("Amount");
-  if (!UserId) missingFields.push("UserId");
+  if (!sourceId) missingFields.push("sourceId");
+  if (!amount) missingFields.push("amount");
+  if (!userId) missingFields.push("userId");
 
   if (missingFields.length > 0) {
     return res.status(400).json({
@@ -1152,91 +1194,52 @@ exports.purchaseBankFulPackage = async function (req, res){
       message: `Missing mandatory fields: ${missingFields.join(', ')}`
     });
   }
-  const findCard = await UserCards.findOne({_id: CardId, UserId: UserId});
-  if(!findCard){
-    return res.status(400).json({
-      success: false,
-      message: 'Card not found'
-    });
-  }
+  try {
+    const getUser = await Users.findOne({ _id: userId });
+    if (!getUser) {
+      return res.status(400).json({
+        success: false,
+        message: `No user found`
+      });
+    }
+    var paymentData = await client.payments.create({
+      amountMoney: {
+          amount: BigInt(amount),
+          currency: "AUD",
+      },
+      sourceId: sourceId,
+      idempotencyKey: uuidv4(),
+      customerId: getUser?.SquareCustomerId,
+  });
+    var packageData = await PackagesModel.findOne({ Price: amount });
+    if (!packageData) {
+      return res.json({
+        success: false,
+        message: "Package not found",
+        data: null,
+      });
+    }
+    var findUserCoins = await UserCoins.findOne({ UserId: userId });
+    if (!findUserCoins) {
+      var userCoins = new UserCoins();
+      userCoins.UserId = userId;
+      if (!Array.isArray(userCoins.BankfulResponse)) {
+        userCoins.BankfulResponse = [];
+      }
+      userCoins.BankfulResponse.push(paymentData?.payment);
+      userCoins.CardId = sourceId;
+      if (packageData?.FreeCoins > 0) {
+        userCoins.HeldCoins += packageData?.Coins + packageData?.FreeCoins;
+      } else {
+        userCoins.HeldCoins += packageData?.Coins;
+      }
 
-  const payload = {
-    request_action: "CCAUTHCAP",
-    amount: Amount,
-    request_currency: "AUD",
-    pmt_numb: findCard?.pmt_numb,
-    pmt_key: findCard?.pmt_key,
-    pmt_expiry: findCard?.exp_mm + "/"+ findCard?.exp_yy,
-    req_username: process.env.BANKFUL_USERNAME,
-    req_password: process.env.BANKFUL_PASSWORD,
-    xtl_order_id: generateOrderId()
-  };
-  
-  // Generate signature
-  const salt = payload.req_password;
-  const sortedKeys = Object.keys(payload).sort();
-  
-  const payloadString = sortedKeys
-    .filter(key => key !== "signature")
-    .filter(key => payload[key] !== undefined && payload[key] !== null && payload[key] !== "")
-    .map(key => `${key}${payload[key]}`)
-    .join("");
-  
-  const signature = CryptoJS.HmacSHA256(payloadString, salt).toString();
-  payload.signature = signature;
-  
-  // Convert payload to x-www-form-urlencoded string
-  const formBody = Object.entries(payload)
-    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-    .join('&');
-  
-  // Final Fetch Call
-  fetch(`${process.env.BANKFUL_URL}/api/transaction/api`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'cache-control': 'no-cache'
-    },
-    body: formBody
-  })
-    .then(res => res.json())
-    .then(async response => {
-      if(response && response?.TRANS_STATUS_NAME == 'DECLINED'){
-        return res.json({
-          status: false,
-          message: "Error in purchasing package",
-          data: response
-        })
-      }
-      var packageData = await PackagesModel.findOne({ Price: Amount });
-      if (!packageData) {
-        return res.json({
-          success: false,
-          message: "Package not found",
-          data: null,
-        });
-      }
-      var findUserCoins = await UserCoins.findOne({ UserId: UserId });
-      if (!findUserCoins) {
-        var userCoins = new UserCoins();
-        userCoins.UserId = UserId;
-        if (!Array.isArray(userCoins.BankfulResponse)) {
-          userCoins.BankfulResponse = [];
-        }
-        userCoins.BankfulResponse.push(response);
-        userCoins.CardId = findCard?._id;
-        if (packageData?.FreeCoins > 0) {
-          userCoins.HeldCoins += packageData?.Coins + packageData?.FreeCoins;
-        } else {
-          userCoins.HeldCoins += packageData?.Coins;
-        }
-    
-        await userCoins.save();
-        return res.json({
-          status: true,
-          message: "Package purchased",
-          data: response
-        })
+      await userCoins.save();
+      return res.json({
+        status: true,
+        message: "Package purchased",
+        data: paymentData?.payment?.status
+      })
     } else {
       if (packageData?.FreeCoins > 0) {
         findUserCoins.HeldCoins += packageData?.Coins + packageData?.FreeCoins;
@@ -1246,23 +1249,94 @@ exports.purchaseBankFulPackage = async function (req, res){
       if (!Array.isArray(findUserCoins.BankfulResponse)) {
         findUserCoins.BankfulResponse = [];
       }
-      findUserCoins.BankfulResponse.push(response);
-      findUserCoins.CardId = findCard?._id;
-  
+      findUserCoins.BankfulResponse.push(paymentData?.payment);
+      findUserCoins.CardId = sourceId;
+
       await findUserCoins.save();
       return res.json({
         status: true,
         message: "Package purchased",
-        data: response
+        data: paymentData?.payment?.status
       })
     }
-    })
-    .catch(err => {
+  } catch(error){
+    if (error?.response && error?.response?.data && error?.response?.data?.errors) {
+      const apiErrors = error.response.data.errors;
+  
+      // Extract details from errors array
+      const formattedErrors = apiErrors.map(err => ({
+        code: err.code,
+        message: err.detail,
+        field: err.field
+      }));
       return res.status(400).json({
         success: false,
-        message: err
+        message: formattedErrors
       });
-    });
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'An unexpected error occurred'
+      });
+    }
+  }
+
+  // const payload = {
+  //   request_action: "CCAUTHCAP",
+  //   amount: Amount,
+  //   request_currency: "AUD",
+  //   pmt_numb: findCard?.pmt_numb,
+  //   pmt_key: findCard?.pmt_key,
+  //   pmt_expiry: findCard?.exp_mm + "/" + findCard?.exp_yy,
+  //   req_username: process.env.BANKFUL_USERNAME,
+  //   req_password: process.env.BANKFUL_PASSWORD,
+  //   xtl_order_id: generateOrderId()
+  // };
+
+  // // Generate signature
+  // const salt = payload.req_password;
+  // const sortedKeys = Object.keys(payload).sort();
+
+  // const payloadString = sortedKeys
+  //   .filter(key => key !== "signature")
+  //   .filter(key => payload[key] !== undefined && payload[key] !== null && payload[key] !== "")
+  //   .map(key => `${key}${payload[key]}`)
+  //   .join("");
+
+  // const signature = CryptoJS.HmacSHA256(payloadString, salt).toString();
+  // payload.signature = signature;
+
+  // // Convert payload to x-www-form-urlencoded string
+  // const formBody = Object.entries(payload)
+  //   .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+  //   .join('&');
+
+  // // Final Fetch Call
+  // fetch(`${process.env.BANKFUL_URL}/api/transaction/api`, {
+  //   method: 'POST',
+  //   headers: {
+  //     'Content-Type': 'application/x-www-form-urlencoded',
+  //     'cache-control': 'no-cache'
+  //   },
+  //   body: formBody
+  // })
+  //   .then(res => res.json())
+  //   .then(async response => {
+  //     if (response && response?.TRANS_STATUS_NAME == 'DECLINED') {
+  //       return res.json({
+  //         status: false,
+  //         message: "Error in purchasing package",
+  //         data: response
+  //       })
+  //     }
+
+  //   })
+  //   .catch(err => {
+  //     return res.status(400).json({
+  //       success: false,
+  //       message: err
+  //     });
+  //   });
 };
 
 exports.getCoins = async function (req, res) {
@@ -1330,6 +1404,49 @@ exports.getCoins = async function (req, res) {
         HeldCoins: findUserCoins.HeldCoins
       }
     });
+  }
+};
+
+exports.registerCustomer = async function (req, res) {
+  try {
+    const {
+      emailAddress,
+      userId
+    } = req.body;
+
+    const missingFields = [];
+
+    if (!emailAddress) missingFields.push("emailAddress");
+    // if (!userId) missingFields.push("userId");
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Missing mandatory fields: ${missingFields.join(', ')}`
+      });
+    }
+    const customer = await client.customers.create({
+      idempotencyKey: uuidv4(),
+      emailAddress: emailAddress,
+    });
+    if (customer?.customer?.id) {
+      // Example: save to DB
+      await Users.create({
+        squareCustomerId: customer.customer.id,
+        email: customer.customer.emailAddress,
+        createdAt: new Date(customer.customer.createdAt),
+      });
+    }
+  } catch (error) {
+    if (error instanceof SquareError) {
+      error.errors.forEach(function (e) {
+        console.log(e.category);
+        console.log(e.code);
+        console.log(e.detail);
+      });
+    } else {
+      console.log("Unexpected error occurred: ", error);
+    }
   }
 };
 
