@@ -1177,14 +1177,14 @@ exports.deleteCard = async function (req, res) {
 };
 exports.purchaseBankFulPackage = async function (req, res) {
   const {
-    sourceId,
+    paymentData,
     amount,
     userId,
   } = req.body;
 
   const missingFields = [];
 
-  if (!sourceId) missingFields.push("sourceId");
+  if (!paymentData) missingFields.push("paymentData");
   if (!amount) missingFields.push("amount");
   if (!userId) missingFields.push("userId");
 
@@ -1202,15 +1202,6 @@ exports.purchaseBankFulPackage = async function (req, res) {
         message: `No user found`
       });
     }
-    var paymentData = await client.payments.create({
-      amountMoney: {
-          amount: BigInt(amount),
-          currency: "AUD",
-      },
-      sourceId: sourceId,
-      idempotencyKey: uuidv4(),
-      customerId: getUser?.SquareCustomerId,
-  });
     var packageData = await PackagesModel.findOne({ Price: amount });
     if (!packageData) {
       return res.json({
@@ -1226,8 +1217,7 @@ exports.purchaseBankFulPackage = async function (req, res) {
       if (!Array.isArray(userCoins.BankfulResponse)) {
         userCoins.BankfulResponse = [];
       }
-      userCoins.BankfulResponse.push(paymentData?.payment);
-      userCoins.CardId = sourceId;
+      userCoins.BankfulResponse.push(paymentData);
       if (packageData?.FreeCoins > 0) {
         userCoins.HeldCoins += packageData?.Coins + packageData?.FreeCoins;
       } else {
@@ -1237,8 +1227,7 @@ exports.purchaseBankFulPackage = async function (req, res) {
       await userCoins.save();
       return res.json({
         status: true,
-        message: "Package purchased",
-        data: paymentData?.payment?.status
+        message: "Package purchased"
       })
     } else {
       if (packageData?.FreeCoins > 0) {
@@ -1249,14 +1238,12 @@ exports.purchaseBankFulPackage = async function (req, res) {
       if (!Array.isArray(findUserCoins.BankfulResponse)) {
         findUserCoins.BankfulResponse = [];
       }
-      findUserCoins.BankfulResponse.push(paymentData?.payment);
-      findUserCoins.CardId = sourceId;
+      findUserCoins.BankfulResponse.push(paymentData);
 
       await findUserCoins.save();
       return res.json({
         status: true,
-        message: "Package purchased",
-        data: paymentData?.payment?.status
+        message: "Package purchased"
       })
     }
   } catch(error){

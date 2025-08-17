@@ -14,10 +14,6 @@ const userCoinsSchema = new schema({
     type: [Object], // or more strictly: [mongoose.Schema.Types.Mixed]
     default: []
   },
-  CardId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'UserCards',
-  },
   IsActive: {
     type: Boolean,
     default: true,
