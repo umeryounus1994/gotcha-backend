@@ -24,6 +24,7 @@ const client = new SquareClient({
   token: process.env.SQ_ACCESS_TOKEN,
   environment: process.env.SQUARE_URL,
 });
+let mailer = require('../utilities/mailer');
 const { v4: uuidv4 } = require('uuid');
 
 // Login:
@@ -1154,6 +1155,7 @@ exports.getUserCards = async function (req, res) {
   const cards = await client.cards.list({
     customerId: getUser?.SquareCustomerId,
   });
+  await mailer.sendMailReceipt(getUser?.Email, getUser?.FullName, 'https://squareup.com/receipt/preview/HvKiUaSEBaXKthfXnH25duWYW4YZY');
   res.json({
     success: true,
     message: 'User Cards',
@@ -1238,6 +1240,7 @@ exports.purchaseBankFulPackage = async function (req, res) {
       }
 
       await userCoins.save();
+      await mailer.sendMailReceipt(getUser?.Email, getUser?.FullName, paymentData?.receipt_url);
       return res.json({
         status: true,
         message: "Package purchased"
@@ -1252,7 +1255,7 @@ exports.purchaseBankFulPackage = async function (req, res) {
         findUserCoins.BankfulResponse = [];
       }
       findUserCoins.BankfulResponse.push(paymentData);
-
+      await mailer.sendMailReceipt(getUser?.Email, getUser?.FullName, paymentData?.receipt_url);
       await findUserCoins.save();
       return res.json({
         status: true,
