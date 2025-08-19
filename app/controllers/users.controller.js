@@ -22,7 +22,7 @@ const CryptoJS = require('crypto-js');
 const { SquareClient, SquareEnvironment, SquareError } = require("square");
 const client = new SquareClient({
   token: process.env.SQ_ACCESS_TOKEN,
-  environment: SquareEnvironment.Sandbox,
+  environment: process.env.SQUARE_URL,
 });
 const { v4: uuidv4 } = require('uuid');
 
@@ -75,7 +75,8 @@ exports.login = function (req, res) {
                 ProfilePicture: user?.ProfilePicture,
                 PurchasePackage: user?.PurchasePackage,
                 PurchasePackageExpired: PurchasePackageExpired,
-                HeldCoins: usercoins?.HeldCoins || 0
+                HeldCoins: usercoins?.HeldCoins || 0,
+                SquareCustomerId: user?.SquareCustomerId ? user?.SquareCustomerId : customer?.customer?.id
               };
 
               let token = jwt.sign(userData, Constants.JWT.secret, {
@@ -1141,12 +1142,24 @@ exports.addCard = async function (req, res) {
 };
 
 exports.getUserCards = async function (req, res) {
-  var UserId = req.body.UserId;
-  var userCards = await UserCards.find({ UserId: UserId });
+  var userId = req.body.UserId;
+  
+  const getUser = await Users.findOne({ _id: userId });
+  if (!getUser || !getUser?.SquareCustomerId) {
+    return res.status(400).json({
+      success: false,
+      message: `No user or square customer found`
+    });
+  }
+  const cards = await client.cards.list({
+    customerId: getUser?.SquareCustomerId,
+  });
   res.json({
     success: true,
     message: 'User Cards',
-    data: userCards,
+    data: JSON.parse(JSON.stringify(cards.data, (_, value) =>
+    typeof value === 'bigint' ? value.toString() : value
+  )),
   });
 
 };
