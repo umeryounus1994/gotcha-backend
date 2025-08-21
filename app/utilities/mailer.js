@@ -52,7 +52,7 @@ async function sendMailReceipt(email, name, receiptUrl) {
   sgMail
     .send({
       to: email,
-      from: { name: "GotchaApp", email: "gotchadoesadvertising@gmail.com" },
+      from: { name: "GotchaApp", email: "support@trygotcha.com" },
       subject: 'Your Payment Receipt',
       text: `
       <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 8px;">
@@ -106,7 +106,7 @@ async function sendMailReceipt(email, name, receiptUrl) {
     `}`,
     })
     .then(
-      () => {},
+      () => { console.log('emailsent')},
       (error) => {
         console.error(error);
 
