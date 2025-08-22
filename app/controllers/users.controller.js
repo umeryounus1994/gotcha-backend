@@ -1155,7 +1155,7 @@ exports.getUserCards = async function (req, res) {
   const cards = await client.cards.list({
     customerId: getUser?.SquareCustomerId,
   });
-  await mailer.sendMailReceipt(getUser?.Email, getUser?.FullName, 'https://squareup.com/receipt/preview/HvKiUaSEBaXKthfXnH25duWYW4YZY');
+  //await mailer.sendMailReceipt(getUser?.Email, getUser?.FullName, 'https://squareup.com/receipt/preview/HvKiUaSEBaXKthfXnH25duWYW4YZY');
   res.json({
     success: true,
     message: 'User Cards',
