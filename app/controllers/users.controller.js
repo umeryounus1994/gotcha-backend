@@ -1413,13 +1413,12 @@ exports.getCoins = async function (req, res) {
 exports.registerCustomer = async function (req, res) {
   try {
     const {
-      emailAddress,
       userId
     } = req.body;
 
     const missingFields = [];
 
-    if (!emailAddress) missingFields.push("emailAddress");
+    if (!userId) missingFields.push("userId");
     // if (!userId) missingFields.push("userId");
 
     if (missingFields.length > 0) {
@@ -1428,18 +1427,26 @@ exports.registerCustomer = async function (req, res) {
         message: `Missing mandatory fields: ${missingFields.join(', ')}`
       });
     }
-    const customer = await client.customers.create({
-      idempotencyKey: uuidv4(),
-      emailAddress: emailAddress,
-    });
-    if (customer?.customer?.id) {
-      // Example: save to DB
-      await Users.create({
-        squareCustomerId: customer.customer.id,
-        email: customer.customer.emailAddress,
-        createdAt: new Date(customer.customer.createdAt),
+        const getUser = await Users.findOne({ _id: userId });
+    if (!getUser) {
+      return res.status(400).json({
+        success: false,
+        message: `No user found`
       });
     }
+    const customer = await client.customers.create({
+      idempotencyKey: uuidv4(),
+      emailAddress: getUser?.Email.toLowerCase().trim(),
+    });
+      // Example: save to DB
+     if (customer?.customer?.id) {
+            await this.updateUserProfile(userId, {SquareCustomerId: customer?.customer?.id}, {new: true}, async function (err, result) {});
+            return res.status(400).json({
+              success: true,
+              message: `Customer Registered`,
+              data: customer?.customer?.id
+            });
+      }
   } catch (error) {
     if (error instanceof SquareError) {
       error.errors.forEach(function (e) {
