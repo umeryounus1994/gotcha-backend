@@ -11,8 +11,8 @@ admin.initializeApp({
 
 const { SquareClient, SquareEnvironment, SquareError } = require("square");
 const client = new SquareClient({
-  token: 'EAAAl1euQKyKUNUZ-S7ZsiOmBb4BDHPJJaQ9o-y1Qkl6OGvwvvsjfGiGeJq6RoSm',
-  environment: SquareEnvironment.Sandbox,
+  token: process.env.SQ_ACCESS_TOKEN,
+  environment: process.env.SQUARE_URL,
 });
 const { v4: uuidv4 } = require('uuid');
 
