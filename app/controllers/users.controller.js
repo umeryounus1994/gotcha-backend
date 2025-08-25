@@ -410,7 +410,7 @@ exports.wallet = function (req, res) {
           res.json({
             success: true,
             message: "No Records Found.",
-            data: null,
+            data: [],
           });
         } else {
           let walletOffers = [];
