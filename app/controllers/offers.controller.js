@@ -568,6 +568,8 @@ exports.get = async function (req, res) {
       data: null,
     });
   }
+    findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
+    await findCoins.save();
 
   //console.log("lat ",lat, ' lng: ', lng, ' distance: ',distance, ' userId: ',userId)
   // let currentLocation = {
@@ -630,9 +632,6 @@ exports.get = async function (req, res) {
   if (offersList.length == 0) {
     msg = 'No Offers Found';
   } else {
-    
-    findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
-    findCoins.save();
     msg = offersList.length + ' Offers Found.';
   }
 
