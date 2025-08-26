@@ -380,6 +380,7 @@ async function (req, res) {
           BSB: result.BSB,
           // ETHAddress: result.ETHAddress,
           ProfilePicture: result.ProfilePicture,
+          Address: result.Address || "",
           // YearOfBirth: result.YearOfBirth,
           // PostCode: result.PostCode,
           // Gender: result.Gender,
@@ -437,6 +438,7 @@ async function (req, res) {
           user.Password = hash;
           user.AccountNumber = req.body.AccountNumber,
           user.BSB = req.body.BSB,
+          user.Address = req.body.Address || "";
           // user.AreaId = AreaId;
           // user.YearOfBirth = YearOfBirth;
           // user.PostCode = PostCode;

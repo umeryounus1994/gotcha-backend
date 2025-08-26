@@ -54,6 +54,10 @@ const userSchema = new schema({
     type: String,
     default: "",
   },
+  Address: {
+    type: String,
+    default: "",
+  },
   SocialAccounts: [SocialAccounts],
   Location: {
     type: pointSchema,
