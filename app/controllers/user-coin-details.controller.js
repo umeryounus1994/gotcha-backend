@@ -233,6 +233,7 @@ exports.listAllUser = function (req, res) {
         BSB: 1,
         TotalCoin: 1,
         PurchasePackage: 1,
+        Address:1,
         PackagePrice: 1,
         PackageExpiryDate: 1,
         CreationTimestamp: 1,
