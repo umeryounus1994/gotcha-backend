@@ -196,6 +196,7 @@ exports.listAllUser = function (req, res) {
         _id: '$_id',
         FullName: { $first: '$FullName' },
         Email: { $first: '$Email' },
+        Address: { $first: '$Address' },
         ContactNumber: { $first: '$ContactNumber' },
         AccountNumber: { $first: '$AccountNumber' },
         BSB: { $first: '$BSB' },
