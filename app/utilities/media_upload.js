@@ -1,46 +1,54 @@
-const aws = require('aws-sdk');
-const multer = require('multer');
-const multerS3 = require('multer-s3');
-var path = require('path');
+const aws = require("aws-sdk");
+const { v4: uuidv4 } = require("uuid");
+const multer = require("multer");
+const multerS3 = require("multer-s3");
+const { randomNumber } = require("./randomNumber");
+const path = require('path');
 
-aws.config.update({
-  secretAccessKey: 'EBOb5X0HfClSHlJ7UO9EU/4oMebBzb2DanOBeXaJ',
-  accessKeyId: 'AKIATCXJO4KI3J24TX5S',
-  region: 'us-east-1'
-  });
+const spacesEndpoint = new aws.Endpoint('nyc3.digitaloceanspaces.com');
 
-  const s3 = new aws.S3();
+// aws.config.update({
 
+// });
+const s3 = new aws.S3({
+  endpoint: spacesEndpoint
+});
+const upload = multer({
+  storage: multerS3({
+    s3: s3,
+    bucket: 'mysticcrts',
+    acl: 'public-read',
+    contentType: multerS3.AUTO_CONTENT_TYPE,
+    metadata(req, file, cb) {
+      cb(null, { fieldName: file.fieldname });
+    },
+    key(req, file, cb) {
+      const fileExtension = path.extname(file.originalname); // get .jpg, .png, etc.
+      const fileName = `${uuidv4()}_${randomNumber(6)}${fileExtension}`;
+      cb(null, `_${Date.now()}_${fileName}`);
+    },
+  })
+});
 
-  const upload = multer({
-    storage: multerS3({
-      acl: 'public-read',
-      s3,
-      bucket: 'tagtap-ar',
-      contentType: multerS3.AUTO_CONTENT_TYPE,
-      metadata: function (req, file, cb) {
-        cb(null, {fieldName: file.fieldname});
-      },
-      key: function (req, file, cb) {
-        var fileName = file.originalname.toLowerCase();
-        cb(null, Date.now().toString()+fileName)
-      }
-    })
-  });
-
-
-// file store to localstorage
-
-    // const storage = multer.diskStorage({
-    //     destination: function(req, file, cb){
-    //         cb(null, __basedir + '/profile/');
-    //     },
-    //     filename: function(req, file, cb) {
-        
-    //         var fileName = file.originalname.toLowerCase();
-    //         cb(null, file.fieldname.toLowerCase() + '-' +  Date.now() + fileName.trim())
-    //     }
-    // });
-    // const upload = multer({storage: storage});
-
-    module.exports = upload;
+// const s3 = new aws.S3({ useAccelerateEndpoint: true, endpoint: spacesEndpoint,
+//   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+//   accessKeyId: process.env.AWS_ACCESS_KEY_ID });
+// module.exports = multer({
+//   storage: multerS3({
+//     acl: "public-read",
+//     s3,
+//     bucket: process.env.AWS_MEDIA_BUCKET,
+//     contentType: multerS3.AUTO_CONTENT_TYPE,
+//     metadata(req, file, cb) {
+//       cb(null, { fieldName: file.fieldname });
+//     },
+//     key(req, file, cb) {
+//       const fileName = `${uuidv4()}_${randomNumber(6)}`;
+//       cb(null, `_${Date.now().toString()}_${fileName}`);
+//     },
+//   }),
+//   limits: {
+//     fileSize: 50000000, // 8 MB
+//   },
+// });
+module.exports = upload;

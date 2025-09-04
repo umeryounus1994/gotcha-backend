@@ -6,12 +6,17 @@ exports.add = function (req, res) {
   var Price = req.body.Price;
   var Coins = req.body.Coins;
   var FreeCoins = req.body.FreeCoins;
-
+  
+var PackageImage = null;
+  if(req.files && req.files.PackageImage){
+    PackageImage = req.files.PackageImage[0].location;
+  }
   var package = new Packages();
   package.Name = Name;
   package.Price = Price;
   package.Coins = Coins;
   package.FreeCoins = FreeCoins;
+  package.PackageImage = PackageImage;
 
   package.save(function (err) {
     if (err) {
@@ -56,13 +61,19 @@ exports.update = function (req, res) {
   var FreeCoins = req.body.FreeCoins;
   var Price = req.body.Price;
   var Coins = req.body.Coins;
+  var PackageImage = null;
   var selection = { _id: Id };
+  if (req.files && req.files.PackageImage) {
+    PackageImage = req.files.PackageImage[0].location;
+  }
   var updatedData = {
     IsActive: IsActive,
     Name: Name,
     Coins: Coins,
     Price: Price,
     FreeCoins: FreeCoins,
+    PackageImage: PackageImage,
+    IsActive: true
   };
   Packages.update(selection, updatedData, function callback(errr, doc) {
     if (errr) {

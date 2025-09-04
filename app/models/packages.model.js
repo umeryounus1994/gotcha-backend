@@ -17,6 +17,10 @@ const packagesSchema = new schema({
   FreeCoins: {
     type: Number
   },
+  PackageImage: {
+    type: String,
+    default: null,
+  },
   IsActive: {
     type: Boolean,
     default: true,

@@ -635,8 +635,20 @@ authRoutes.route("/users/export-excel").get(userCoinDetailsController.exportExce
 
 // Packages:
 router.route("/packages").get(packagesController.list);
-authRoutes.route("/packages/add").post(packagesController.add);
-authRoutes.route("/packages/update").post(packagesController.update);
+authRoutes.post('/packages/add',
+mediaUpload.fields([
+  {
+    name: 'PackageImage', maxCount: 1
+  }
+]),
+packagesController.add);
+authRoutes.post('/packages/update',
+mediaUpload.fields([
+  {
+    name: 'PackageImage', maxCount: 1
+  }
+]),
+packagesController.update);
 authRoutes.route("/packages/delete/:Id").post(packagesController.delete);
 
 // Dashboard:
