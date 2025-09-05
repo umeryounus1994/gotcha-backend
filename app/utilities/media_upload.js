@@ -1,3 +1,4 @@
+require('dotenv').config();
 const aws = require("aws-sdk");
 const { v4: uuidv4 } = require("uuid");
 const multer = require("multer");
@@ -5,18 +6,24 @@ const multerS3 = require("multer-s3");
 const { randomNumber } = require("./randomNumber");
 const path = require('path');
 
-const spacesEndpoint = new aws.Endpoint('nyc3.digitaloceanspaces.com');
+const spacesEndpoint = new aws.Endpoint(process.env.AWS_ENDPOINT);
 
 // aws.config.update({
 
 // });
+aws.config.update({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.AWS_REGION || 'nyc3'
+});
+console.log('AWS config updated', process.env.AWS_ACCESS_KEY_ID);
 const s3 = new aws.S3({
   endpoint: spacesEndpoint
 });
 const upload = multer({
   storage: multerS3({
     s3: s3,
-    bucket: 'mysticcrts',
+    bucket: process.env.AWS_MEDIA_BUCKET,
     acl: 'public-read',
     contentType: multerS3.AUTO_CONTENT_TYPE,
     metadata(req, file, cb) {
