@@ -28,6 +28,7 @@ const packagesController = require("../controllers/packages.controller");
 const offersController = require("../controllers/offers.controller");
 const setupController = require("../controllers/setup.controller");
 const dashboardController = require("../controllers/dashboard.controller");
+const versionsController = require("../controllers/versions.controller");
 let Offers = require('../models/offers.model');
 var user =require('../models/users.model.js');
 const bcrypt = require("bcrypt");
@@ -685,6 +686,14 @@ router.route('/users/purchase-user-package').post(usersController.purchaseBankFu
 
 // router.route("/users/register-square-customer").post(usersController.registerSquareCustomer);
 router.route("/users/register-customer").post(usersController.registerCustomer);
+
+
+
+// Versions:
+authRoutes.route("/versions").get(versionsController.list);
+authRoutes.route("/versions").post(versionsController.add);
+authRoutes.route("/versions/update").post(versionsController.update);
+authRoutes.route("/versions/delete/:Id").post(versionsController.delete);
 
 module.exports = {
   apiRoutes: router,
