@@ -20,6 +20,10 @@ const packagesSchema = new schema({
   PackageImage: {
     type: String,
     default: null,
+  }, 
+  IsBanner: {
+    type: Boolean,
+    default: false,
   },
   IsActive: {
     type: Boolean,
