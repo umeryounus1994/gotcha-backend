@@ -7,7 +7,7 @@ const packagesSchema = new schema({
     required: true,
   },
   Price: {
-    type: Number,
+    type: String,
     required: true,
   },
   Coins: {
@@ -16,6 +16,9 @@ const packagesSchema = new schema({
   },
   FreeCoins: {
     type: Number
+  },
+  FreeCoinsText: {
+    type: String
   },
   PackageImage: {
     type: String,

@@ -16,7 +16,6 @@ aws.config.update({
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   region: process.env.AWS_REGION || 'nyc3'
 });
-console.log('AWS config updated', process.env.AWS_ACCESS_KEY_ID);
 const s3 = new aws.S3({
   endpoint: spacesEndpoint
 });

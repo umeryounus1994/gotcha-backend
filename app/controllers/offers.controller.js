@@ -275,23 +275,29 @@ exports.claimed = function (req, res) {
 exports.holdOffer = async function (req, res) {
   var OfferId = req.body.OfferId;
   var UserId = req.body.UserId;
-   let findCoins = await UserCoins.findOne({ UserId: UserId });
-  // if (!findCoins || findCoins?.HeldCoins < 200000) {
-  //   return res.json({
-  //     success: false,
-  //     message: 'Not enough coins to plant this offer',
-  //     data: null,
-  //   });
+  //var coinType = req.body.coinType; // 'HeldCoins' or 'BonusCoins'
+  
+  let findCoins = await UserCoins.findOne({ UserId: UserId });
+  
+  // Check if user has enough coins based on coinType
+  // if (coinType === 'BonusCoins') {
+  //   if (!findCoins || (findCoins?.BonusCoins || 0) < 200000) {
+  //     return res.json({
+  //       success: false,
+  //       message: 'Not enough bonus coins to plant this offer',
+  //       data: null,
+  //     });
+  //   }
+  // } else {
+  //   if (!findCoins || (findCoins?.HeldCoins || 0) < 200000) {
+  //     return res.json({
+  //       success: false,
+  //       message: 'Not enough coins to plant this offer',
+  //       data: null,
+  //     });
+  //   } 
   // }
 
-  // let heldOfferUser = await OffersHeld.findOne({ OfferId: OfferId, UserId: UserId, Status: 'pending' });
-  // if(heldOfferUser){
-  //   return res.json({
-  //     success: false,
-  //     message: 'You have already placed this offer before',
-  //     data: null,
-  //   });
-  // }
   let offerData = await Offers.findById(OfferId);
   if (!offerData) {
     return res.json({
@@ -409,6 +415,12 @@ exports.holdOffer = async function (req, res) {
     //findCoins.save();
     offerData.Location = location;
     offerData.save();
+    // if (coinType === 'BonusCoins') {
+    //   findCoins.BonusCoins = findCoins?.BonusCoins - 200000;
+    // } else {
+    //   findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
+    // }
+    // findCoins.save();
     // Send success response
     return res.json({
       success: true,
@@ -558,17 +570,32 @@ exports.get = async function (req, res) {
   var userId = req.body.userId;
   var lat = req.body.latitude;
   var lng = req.body.longitude;
+  var coinType = req.body.coinType;
   var distance = parseInt(req.body.distance);
 
   let findCoins = await UserCoins.findOne({ UserId: userId });
-  if (!findCoins || findCoins?.HeldCoins < 200000) {
-    return res.json({
-      success: false,
-      message: 'Not enough coins',
-      data: null,
-    });
+  if (coinType === 'BonusCoins') {
+    if (!findCoins || (findCoins?.BonusCoins || 0) < 200000) {
+      return res.json({
+        success: false,
+        message: 'Not enough bonus coins to plant this offer',
+        data: null,
+      });
+    }
+  } else {
+    if (!findCoins || (findCoins?.HeldCoins || 0) < 200000) {
+      return res.json({
+        success: false,
+        message: 'Not enough coins to plant this offer',
+        data: null,
+      });
+    }
   }
-    findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
+    if (coinType === 'BonusCoins') {
+      findCoins.BonusCoins = findCoins?.BonusCoins - 200000;
+    } else {
+      findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
+    }
     await findCoins.save();
 
   //console.log("lat ",lat, ' lng: ', lng, ' distance: ',distance, ' userId: ',userId)

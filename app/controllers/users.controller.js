@@ -217,7 +217,7 @@ module.exports.getAllNotificationUser = (callback) => {
 
 module.exports.saveWatchadCoins = async function (req, res) {
   const { UserId, action } = req.body;
-  const COIN_VALUE = 200000; // Fixed value for each watched ad
+  const COIN_VALUE = 200000;
 
   if (!UserId || !action) {
     return res.status(400).json({
@@ -226,79 +226,46 @@ module.exports.saveWatchadCoins = async function (req, res) {
       data: null
     });
   }
+
   var userData = await UserCoins.findOne({ UserId });
   if (userData == null) {
     var userCoints = new UserCoins();
     userCoints.UserId = UserId;
-    userCoints.HeldCoins = COIN_VALUE;
+    userCoints.HeldCoins = 0;
+    userCoints.BonusCoins = COIN_VALUE;
     userCoints.save();
     return res.json({
       success: true,
-      message: "Coins added successfully",
+      message: "Bonus coins added successfully",
       data: {
-        HeldCoins: COIN_VALUE
+        HeldCoins: 0,
+        BonusCoins: COIN_VALUE
       }
     });
   }
+
   if (action === 'add') {
-    // Add coins for watching ad
-    userData.HeldCoins = (userData?.HeldCoins || 0) + COIN_VALUE;
+    userData.BonusCoins = (userData?.BonusCoins || 0) + COIN_VALUE;
 
     userData.save(function (err, updatedUser) {
       if (err) {
         return res.json({
           success: false,
-          message: "Error saving coins",
+          message: "Error saving bonus coins",
           data: err
         });
       }
 
       return res.json({
         success: true,
-        message: "Coins added successfully",
+        message: "Bonus coins added successfully",
         data: {
-          HeldCoins: updatedUser.HeldCoins
+          HeldCoins: updatedUser.HeldCoins,
+          BonusCoins: updatedUser.BonusCoins
         }
       });
-    });
-  } else if (action === 'deduct') {
-    // Check if user has enough coins
-    if ((userData.HeldCoins || 0) < COIN_VALUE) {
-      return res.json({
-        success: false,
-        message: "Insufficient coins",
-        data: null
-      });
-    }
-
-    // Deduct coins
-    userData.HeldCoins = (userData?.HeldCoins || 0) - COIN_VALUE;
-
-    userData.save(function (err, updatedUser) {
-      if (err) {
-        return res.json({
-          success: false,
-          message: "Error deducting coins",
-          data: err
-        });
-      }
-
-      return res.json({
-        success: true,
-        message: "Coins deducted successfully",
-        data: {
-          HeldCoins: updatedUser.HeldCoins
-        }
-      });
-    });
-  } else {
-    return res.json({
-      success: false,
-      message: "Invalid action. Use 'add' or 'deduct'",
-      data: null
     });
   }
-
 };
 
 exports.updateProfile = function (req, res) {
@@ -1003,7 +970,7 @@ exports.remainingCoins = async function (req, res) {
   res.json({
     success: true,
     message: 'Coins',
-    data: usercoins?.HeldCoins || 0,
+    data: { HeldCoins: usercoins?.HeldCoins || 0, BonusCoins: usercoins?.BonusCoins || 0 },
   });
 
 };
@@ -1227,17 +1194,14 @@ exports.purchaseBankFulPackage = async function (req, res) {
     }
     var findUserCoins = await UserCoins.findOne({ UserId: userId });
     if (!findUserCoins) {
-      var userCoins = new UserCoins();
+      var userCoins = new UserCoins(); 
       userCoins.UserId = userId;
+      userCoins.HeldCoins = packageData?.Coins || 0;
+      userCoins.BonusCoins = packageData?.FreeCoins || 0;
       if (!Array.isArray(userCoins.BankfulResponse)) {
         userCoins.BankfulResponse = [];
       }
       userCoins.BankfulResponse.push(paymentData);
-      if (packageData?.FreeCoins > 0) {
-        userCoins.HeldCoins += packageData?.Coins + packageData?.FreeCoins;
-      } else {
-        userCoins.HeldCoins += packageData?.Coins;
-      }
 
       await userCoins.save();
       await mailer.sendMailReceipt(getUser?.Email, getUser?.FullName, paymentData?.receipt_url);
@@ -1246,11 +1210,8 @@ exports.purchaseBankFulPackage = async function (req, res) {
         message: "Package purchased"
       })
     } else {
-      if (packageData?.FreeCoins > 0) {
-        findUserCoins.HeldCoins += packageData?.Coins + packageData?.FreeCoins;
-      } else {
-        findUserCoins.HeldCoins += packageData?.Coins;
-      }
+      findUserCoins.HeldCoins += packageData?.Coins || 0;
+      findUserCoins.BonusCoins += packageData?.FreeCoins || 0;
       if (!Array.isArray(findUserCoins.BankfulResponse)) {
         findUserCoins.BankfulResponse = [];
       }
@@ -1262,84 +1223,93 @@ exports.purchaseBankFulPackage = async function (req, res) {
         message: "Package purchased"
       })
     }
-  } catch(error){
-    if (error?.response && error?.response?.data && error?.response?.data?.errors) {
-      const apiErrors = error.response.data.errors;
-  
-      // Extract details from errors array
-      const formattedErrors = apiErrors.map(err => ({
-        code: err.code,
-        message: err.detail,
-        field: err.field
-      }));
-      return res.status(400).json({
-        success: false,
-        message: formattedErrors
-      });
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: 'An unexpected error occurred'
-      });
-    }
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: error.message
+    });
   }
+}; // @Umer Purchase Package
+exports.purchasePackage = function (req, res) {
+  var EmailList = req.body.Email;
 
-  // const payload = {
-  //   request_action: "CCAUTHCAP",
-  //   amount: Amount,
-  //   request_currency: "AUD",
-  //   pmt_numb: findCard?.pmt_numb,
-  //   pmt_key: findCard?.pmt_key,
-  //   pmt_expiry: findCard?.exp_mm + "/" + findCard?.exp_yy,
-  //   req_username: process.env.BANKFUL_USERNAME,
-  //   req_password: process.env.BANKFUL_PASSWORD,
-  //   xtl_order_id: generateOrderId()
-  // };
 
-  // // Generate signature
-  // const salt = payload.req_password;
-  // const sortedKeys = Object.keys(payload).sort();
+  if (!EmailList) {
+    return res.json({
+      success: false,
+      message: "Email is required",
+      data: null,
+    });
+  }
+  if (!req.body.PackagePrice) {
+    return res.json({
+      success: false,
+      message: "Package Price is required",
+      data: null,
+    });
+  }
+  const promiseArr = [];
+  return new Promise((resolve, reject) => {
+    for (let key in EmailList) {
+      promiseArr.push(
+        new Promise(async (resolvve, rejectt) => {
+          Users.findOne({ Email: EmailList[key] }, function (err, user) {
+            if (err) rejectt(false);
+            else {
+              if (user) {
+                var userId = user._id;
 
-  // const payloadString = sortedKeys
-  //   .filter(key => key !== "signature")
-  //   .filter(key => payload[key] !== undefined && payload[key] !== null && payload[key] !== "")
-  //   .map(key => `${key}${payload[key]}`)
-  //   .join("");
+                var selection = { _id: userId };
+                var updatedData = {
+                  PurchasePackage: true,
+                  PackagePrice: req.body.PackagePrice,
+                  PackageDate: req.body.PackageDate || new Date(),
+                  PackageExpiryDate: req.body.PackageExpiryDate || new Date()
+                };
+                Users.updateOne(
+                  selection,
+                  updatedData,
+                  function callback(errr, doc) {
+                    if (errr) {
+                      rejectt(false)
+                    } else {
+                      resolvve(true);
+                    }
+                  }
+                );
+              } else {
+                rejectt(false)
+              }
+            }
+          });
+          resolvve(true);
+        })
+      )
+    }
+    return Promise.all(promiseArr).then(ress => {
+      return res.json({
+        status: true,
+        message: "Package has been purchase successfully",
+        data: null
+      })
+    })
+  });
 
-  // const signature = CryptoJS.HmacSHA256(payloadString, salt).toString();
-  // payload.signature = signature;
 
-  // // Convert payload to x-www-form-urlencoded string
-  // const formBody = Object.entries(payload)
-  //   .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-  //   .join('&');
+};
 
-  // // Final Fetch Call
-  // fetch(`${process.env.BANKFUL_URL}/api/transaction/api`, {
-  //   method: 'POST',
-  //   headers: {
-  //     'Content-Type': 'application/x-www-form-urlencoded',
-  //     'cache-control': 'no-cache'
-  //   },
-  //   body: formBody
-  // })
-  //   .then(res => res.json())
-  //   .then(async response => {
-  //     if (response && response?.TRANS_STATUS_NAME == 'DECLINED') {
-  //       return res.json({
-  //         status: false,
-  //         message: "Error in purchasing package",
-  //         data: response
-  //       })
-  //     }
+exports.remainingCoins = async function (req, res) {
+  var UserId = req.body.UserId;
+  var usercoins = await UserCoins.findOne({ UserId: UserId });
+  res.json({
+    success: true,
+    message: 'Coins',
+    data:  {
+      HeldCoins: usercoins?.HeldCoins || 0,
+      BonusCoins: usercoins?.BonusCoins || 0,
+    },
+  });
 
-  //   })
-  //   .catch(err => {
-  //     return res.status(400).json({
-  //       success: false,
-  //       message: err
-  //     });
-  //   });
 };
 
 exports.getCoins = async function (req, res) {
@@ -1459,9 +1429,3 @@ exports.registerCustomer = async function (req, res) {
     }
   }
 };
-
-function generateOrderId() {
-  const digits = Math.floor(100000 + Math.random() * 900000); // 6-digit number
-  const letter = String.fromCharCode(65 + Math.floor(Math.random() * 26)); // A-Z
-  return `${digits}${letter}`;
-}

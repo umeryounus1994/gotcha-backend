@@ -10,6 +10,10 @@ const userCoinsSchema = new schema({
     type: Number,
     required: true,
   },
+  BonusCoins: { // @Umer Added for bonus coins
+    type: Number,
+    default: 0,
+  },
   BankfulResponse : {
     type: [Object], // or more strictly: [mongoose.Schema.Types.Mixed]
     default: []

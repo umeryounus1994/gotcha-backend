@@ -6,6 +6,7 @@ exports.add = function (req, res) {
   var Price = req.body.Price;
   var Coins = req.body.Coins;
   var FreeCoins = req.body.FreeCoins;
+  var FreeCoinsText = req.body.FreeCoinsText;
   var IsBanner = req.body.IsBanner || false;
   
   var PackageImage = null;
@@ -18,6 +19,7 @@ exports.add = function (req, res) {
   package.Price = Price;
   package.Coins = Coins;
   package.FreeCoins = FreeCoins;
+  package.FreeCoinsText = FreeCoinsText;
   package.PackageImage = PackageImage;
   package.IsBanner = IsBanner;
 
@@ -61,6 +63,7 @@ exports.update = function (req, res) {
   var Id = req.body.Id;
   var Name = req.body.Name;
   var FreeCoins = req.body.FreeCoins;
+  var FreeCoinsText = req.body.FreeCoinsText;
   var Price = req.body.Price;
   var Coins = req.body.Coins;
   var PackageImage = null;
@@ -74,6 +77,7 @@ exports.update = function (req, res) {
     Coins: Coins,
     Price: Price,
     FreeCoins: FreeCoins,
+    FreeCoinsText: FreeCoinsText,
     PackageImage: PackageImage,
     IsBanner: IsBanner,
     IsActive: true
