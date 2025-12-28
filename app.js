@@ -9,9 +9,11 @@ var logger = require('morgan');
 var multer = require('multer');
 var OffersHeld = require('./app/models/offer-held.model.js');
 var OffersClaimedModel = require('./app/models/offer-claimed.model.js');
+var Prizes = require('./app/models/prizes.model.js');
+var PrizePoolData = require('./app/models/prize-pool-data.model.js');
 var moment = require('moment'); // require
 moment().format(); 
-// global.CronJob = require('./app/cron.js');
+global.CronJob = require('./app/cron.js');
 
 // Import: Routes
 let routes = require("./app/routes/api.routes");
@@ -90,9 +92,85 @@ async function checkAndUpdateOffer() {
 }
 function startInterval() {
   checkAndUpdateOffer().finally(() => {
-    setTimeout(startInterval, 3600000); // 1 minute
+    setTimeout(startInterval, 3600000); // 1 hour
   });
 }
 
 startInterval();
+
+// Auto-expire prizes after 24 hours
+async function checkAndExpirePrizes() {
+  try {
+    const twentyFourHoursAgo = moment().subtract(24, 'hours').toDate();
+    
+    // Find prizes that are still Active (not claimed), not deleted, and were dropped more than 24 hours ago
+    const expiredPrizes = await Prizes.find({
+      Status: 'Active',
+      IsActive: true,
+      IsDeleted: false,
+      ClaimedBy: null, // Only expire unclaimed prizes
+      DropDate: { $lte: twentyFourHoursAgo }
+    });
+
+    for (const prize of expiredPrizes) {
+      // Check if a Prize Pool Data entry already exists for this expiration (avoid duplicates)
+      const existingEntry = await PrizePoolData.findOne({
+        PrizeEntryId: prize._id,
+        EventType: '24 Hour Timer Ended'
+      });
+
+      if (existingEntry) {
+        // Already processed, skip
+        continue;
+      }
+
+      // Update prize status
+      prize.Status = 'Expired';
+      await prize.save();
+
+      // Create Prize Pool Data entry for "24 Hour Timer Ended" event
+      const now = moment();
+      const prizePoolEntry = new PrizePoolData();
+      prizePoolEntry.Date = now.toDate();
+      prizePoolEntry.Time = now.format('HH:mm:ss');
+      prizePoolEntry.PrizeId = prize.PrizeId;
+      prizePoolEntry.PrizeDescription = prize.PrizeDescription;
+      prizePoolEntry.Value = prize.PrizeValue;
+      prizePoolEntry.From = 'Gotcha System';
+      prizePoolEntry.To = 'Gotcha HQ';
+      prizePoolEntry.EventType = '24 Hour Timer Ended';
+      prizePoolEntry.Status = 'Active';
+      prizePoolEntry.Notes = '24 Hour Timer Ended - Prize expired automatically';
+      prizePoolEntry.UserId = null; // Unclaimed prize
+      prizePoolEntry.PrizeEntryId = prize._id;
+      
+      // Preserve promotional period from original entry if exists
+      const originalEntry = await PrizePoolData.findOne({ 
+        PrizeEntryId: prize._id,
+        EventType: 'Created'
+      });
+      if (originalEntry && originalEntry.PromotionalPeriod) {
+        prizePoolEntry.PromotionalPeriod = originalEntry.PromotionalPeriod;
+      }
+      
+      await prizePoolEntry.save();
+      
+      console.log(`Prize ${prize.PrizeId} expired after 24 hours`);
+    }
+
+    if (expiredPrizes.length > 0) {
+      console.log(`Auto-expired ${expiredPrizes.length} prize(s) after 24 hours`);
+    }
+  } catch (error) {
+    console.error("Error in checkAndExpirePrizes:", error);
+  }
+}
+
+function startPrizeExpireInterval() {
+  checkAndExpirePrizes().finally(() => {
+    setTimeout(startPrizeExpireInterval, 3600000); // Check every hour
+  });
+}
+
+startPrizeExpireInterval();
 

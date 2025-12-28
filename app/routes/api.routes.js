@@ -29,6 +29,12 @@ const offersController = require("../controllers/offers.controller");
 const setupController = require("../controllers/setup.controller");
 const dashboardController = require("../controllers/dashboard.controller");
 const versionsController = require("../controllers/versions.controller");
+const mainPrizePoolController = require("../controllers/main-prize-pool.controller");
+const prizesController = require("../controllers/prizes.controller");
+const rngDataController = require("../controllers/rng-data.controller");
+const prizePoolDataController = require("../controllers/prize-pool-data.controller");
+const regulatorController = require("../controllers/regulator.controller");
+const validation = require("../middleware/validation");
 let Offers = require('../models/offers.model');
 var user =require('../models/users.model.js');
 const bcrypt = require("bcrypt");
@@ -694,6 +700,183 @@ authRoutes.route("/versions").get(versionsController.list);
 authRoutes.route("/versions").post(versionsController.add);
 authRoutes.route("/versions/update").post(versionsController.update);
 authRoutes.route("/versions/delete/:Id").post(versionsController.delete);
+
+// Main Prize Pool (Admin):
+authRoutes.route("/main-prize-pool").get(mainPrizePoolController.list);
+authRoutes.post('/main-prize-pool',
+  mediaUpload.fields([
+    {
+      name: 'SKUPhoto', maxCount: 1
+    }
+  ]),
+  validation.validateMainPrizePool,
+  function (req, res) {
+    var prizeForm = req.body;
+    
+    if (req.files && req.files.SKUPhoto) {
+      prizeForm.SKUPhoto = req.files.SKUPhoto[0].location;
+    }
+    
+    mainPrizePoolController.add({ body: prizeForm }, res);
+  }
+);
+authRoutes.post('/main-prize-pool/update',
+  mediaUpload.fields([
+    {
+      name: 'SKUPhoto', maxCount: 1
+    }
+  ]),
+  function (req, res) {
+    var prizeForm = req.body;
+    
+    if (req.files && req.files.SKUPhoto) {
+      prizeForm.SKUPhoto = req.files.SKUPhoto[0].location;
+    }
+    
+    mainPrizePoolController.update({ body: prizeForm }, res);
+  }
+);
+authRoutes.route("/main-prize-pool/delete").post(mainPrizePoolController.delete);
+authRoutes.route("/main-prize-pool/total-value").get(mainPrizePoolController.getTotalValue);
+
+// Prizes (User-facing):
+router.route("/prizes/get-nearby").post(
+  validation.validateCoordinates('latitude', 'longitude'),
+  validation.validateNumberRange('distance', 1, 100000),
+  prizesController.getNearby
+);
+router.route("/prizes/claim").post(
+  validation.validatePrizeClaim,
+  prizesController.claim
+);
+router.route("/prizes/:id").get(prizesController.getById);
+authRoutes.route("/prizes").get(prizesController.list);
+authRoutes.route("/prizes/mark-stolen").post(prizesController.markStolen);
+authRoutes.route("/prizes/timer-ended").post(prizesController.handleTimerEnded);
+
+// RNG Data (Admin/Regulator):
+authRoutes.route("/rng-data").get(rngDataController.list);
+authRoutes.route("/rng-data/generate-drop").post(rngDataController.generateDrop);
+authRoutes.route("/rng-data/stats").get(rngDataController.getStats);
+authRoutes.route("/rng-data/export-excel").get(rngDataController.exportExcel);
+authRoutes.route("/rng-data/export-csv").get(rngDataController.exportCSV);
+
+// Prize Pool Data (Admin/Regulator):
+authRoutes.route("/prize-pool-data").get(prizePoolDataController.list);
+authRoutes.route("/prize-pool-data").post(prizePoolDataController.add);
+authRoutes.route("/prize-pool-data/update").post(prizePoolDataController.update);
+authRoutes.route("/prize-pool-data/stats").get(prizePoolDataController.getStats);
+authRoutes.route("/prize-pool-data/mark-rewarded").post(prizePoolDataController.markRewarded);
+authRoutes.route("/prize-pool-data/export-excel").get(prizePoolDataController.exportExcel);
+authRoutes.route("/prize-pool-data/export-csv").get(prizePoolDataController.exportCSV);
+
+// Regulator:
+router.route("/regulator/login").post(
+  validation.validateRequired(['Email', 'Password']),
+  validation.validateEmail('Email'),
+  regulatorController.login
+);
+authRoutes.route("/regulator/register").post(
+  validation.validateRequired(['Email', 'Password', 'FullName']),
+  validation.validateEmail('Email'),
+  validation.validateStringLength('Password', 6, 100),
+  regulatorController.register
+);
+authRoutes.route("/regulator/update").post(regulatorController.update);
+authRoutes.route("/regulator/delete").post(regulatorController.delete);
+authRoutes.route("/regulator/list").get(regulatorController.list);
+authRoutes.route("/regulator").get(regulatorController.list);
+// Regulator data access routes (MUST come before /regulator/:id to avoid route conflicts)
+// Moving these to authRoutes and placing BEFORE /regulator/:id so they match first
+authRoutes.get("/regulator/prize-pool-data/export-excel", prizePoolDataController.exportExcel);
+authRoutes.get("/regulator/prize-pool-data/export-csv", prizePoolDataController.exportCSV);
+authRoutes.get("/regulator/rng-data/export-excel", rngDataController.exportExcel);
+authRoutes.get("/regulator/rng-data/export-csv", rngDataController.exportCSV);
+// Use .get() directly instead of .route().get() to ensure proper route matching
+authRoutes.get("/regulator/prize-pool-data",
+  validation.validateDateRange('startDate', 'endDate'),
+  regulatorController.getPrizePoolData
+);
+authRoutes.get("/regulator/rng-data",
+  validation.validateDateRange('startDate', 'endDate'),
+  regulatorController.getRNGData
+);
+// Parameterized route must come LAST (after all specific routes)
+authRoutes.route("/regulator/:id").get(regulatorController.getById);
+
+// Manual trigger for prize expiration check (admin only)
+authRoutes.route("/prizes/check-expire").get(function(req, res) {
+  // Import the function from app.js context
+  // This is a manual trigger endpoint for testing/admin use
+  const Prizes = require('../models/prizes.model');
+  const PrizePoolData = require('../models/prize-pool-data.model');
+  const moment = require('moment');
+  
+  async function manualExpireCheck() {
+    try {
+      const twentyFourHoursAgo = moment().subtract(24, 'hours').toDate();
+      const expiredPrizes = await Prizes.find({
+        Status: 'Active',
+        IsActive: true,
+        IsDeleted: false,
+        ClaimedBy: null,
+        DropDate: { $lte: twentyFourHoursAgo }
+      });
+
+      let expiredCount = 0;
+      for (const prize of expiredPrizes) {
+        const existingEntry = await PrizePoolData.findOne({
+          PrizeEntryId: prize._id,
+          EventType: '24 Hour Timer Ended'
+        });
+
+        if (existingEntry) continue;
+
+        prize.Status = 'Expired';
+        await prize.save();
+
+        const now = moment();
+        const prizePoolEntry = new PrizePoolData();
+        prizePoolEntry.Date = now.toDate();
+        prizePoolEntry.Time = now.format('HH:mm:ss');
+        prizePoolEntry.PrizeId = prize.PrizeId;
+        prizePoolEntry.PrizeDescription = prize.PrizeDescription;
+        prizePoolEntry.Value = prize.PrizeValue;
+        prizePoolEntry.From = 'Gotcha System';
+        prizePoolEntry.To = 'Gotcha HQ';
+        prizePoolEntry.EventType = '24 Hour Timer Ended';
+        prizePoolEntry.Status = 'Active';
+        prizePoolEntry.Notes = '24 Hour Timer Ended - Prize expired automatically';
+        prizePoolEntry.PrizeEntryId = prize._id;
+        
+        const originalEntry = await PrizePoolData.findOne({ 
+          PrizeEntryId: prize._id,
+          EventType: 'Created'
+        });
+        if (originalEntry && originalEntry.PromotionalPeriod) {
+          prizePoolEntry.PromotionalPeriod = originalEntry.PromotionalPeriod;
+        }
+        
+        await prizePoolEntry.save();
+        expiredCount++;
+      }
+
+      res.json({
+        success: true,
+        message: `Checked and expired ${expiredCount} prize(s)`,
+        data: { expiredCount, totalChecked: expiredPrizes.length }
+      });
+    } catch (error) {
+      res.json({
+        success: false,
+        message: 'Error checking expired prizes',
+        data: error
+      });
+    }
+  }
+  
+  manualExpireCheck();
+});
 
 module.exports = {
   apiRoutes: router,

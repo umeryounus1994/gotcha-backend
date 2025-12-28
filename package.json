@@ -2,7 +2,7 @@
   "name": "gotcha-ar-app",
   "version": "1.0.0",
   "description": "Web Services",
-  "author": "Huzaifa Asif <huzaifa8580@gmail.com | +92 336 0508401>",
+  "author": "Muhammad Umer <umeryounus92@gmail.com | +92 3155820883>",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
