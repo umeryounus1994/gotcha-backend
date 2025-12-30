@@ -766,6 +766,7 @@ authRoutes.route("/prize-pool-data").get(prizePoolDataController.list);
 authRoutes.route("/prize-pool-data").post(prizePoolDataController.add);
 authRoutes.route("/prize-pool-data/update").post(prizePoolDataController.update);
 authRoutes.route("/prize-pool-data/stats").get(prizePoolDataController.getStats);
+authRoutes.route("/prize-pool-data/claimed-by-month").get(prizePoolDataController.getClaimedByMonth);
 authRoutes.route("/prize-pool-data/mark-rewarded").post(prizePoolDataController.markRewarded);
 authRoutes.route("/prize-pool-data/export-excel").get(prizePoolDataController.exportExcel);
 authRoutes.route("/prize-pool-data/export-csv").get(prizePoolDataController.exportCSV);
@@ -804,78 +805,100 @@ authRoutes.get("/regulator/rng-data",
 // Parameterized route must come LAST (after all specific routes)
 authRoutes.route("/regulator/:id").get(regulatorController.getById);
 
-// Manual trigger for prize expiration check (admin only)
-authRoutes.route("/prizes/check-expire").get(function(req, res) {
+// Manual trigger for prize rollback check (admin only)
+authRoutes.route("/prizes/check-rollback").get(function(req, res) {
   // Import the function from app.js context
   // This is a manual trigger endpoint for testing/admin use
   const Prizes = require('../models/prizes.model');
   const PrizePoolData = require('../models/prize-pool-data.model');
-  const moment = require('moment');
+  const moment = require('moment-timezone');
   
-  async function manualExpireCheck() {
+  async function manualRollbackCheck() {
     try {
-      const twentyFourHoursAgo = moment().subtract(24, 'hours').toDate();
-      const expiredPrizes = await Prizes.find({
+      // Find all active, unclaimed prizes
+      const activePrizes = await Prizes.find({
         Status: 'Active',
         IsActive: true,
         IsDeleted: false,
-        ClaimedBy: null,
-        DropDate: { $lte: twentyFourHoursAgo }
+        ClaimedBy: null
       });
 
-      let expiredCount = 0;
-      for (const prize of expiredPrizes) {
-        const existingEntry = await PrizePoolData.findOne({
-          PrizeEntryId: prize._id,
-          EventType: '24 Hour Timer Ended'
-        });
+      let rolledBackCount = 0;
+      const nowAEST = moment().tz('Australia/Sydney');
+      const currentMonthAEST = nowAEST.month();
+      const currentYearAEST = nowAEST.year();
+      const monthStartAEST = nowAEST.clone().startOf('month');
+      const monthEndAEST = nowAEST.clone().endOf('month');
 
-        if (existingEntry) continue;
+      for (const prize of activePrizes) {
+        // Check if we're in a different month/year than when the prize was dropped (using AEST)
+        const prizeDropDateAEST = moment(prize.DropDate).tz('Australia/Sydney');
+        const prizeDropMonth = prizeDropDateAEST.month();
+        const prizeDropYear = prizeDropDateAEST.year();
 
-        prize.Status = 'Expired';
-        await prize.save();
+        // If we're in a different month/year, rollback (re-activate) with new month's promotional period
+        if (currentMonthAEST !== prizeDropMonth || currentYearAEST !== prizeDropYear) {
+          // Check if a rollback entry already exists for this month to avoid duplicates
+          const existingRollbackEntry = await PrizePoolData.findOne({
+            PrizeEntryId: prize._id,
+            EventType: 'Created',
+            Date: {
+              $gte: monthStartAEST.toDate(),
+              $lte: monthEndAEST.toDate()
+            }
+          });
 
-        const now = moment();
-        const prizePoolEntry = new PrizePoolData();
-        prizePoolEntry.Date = now.toDate();
-        prizePoolEntry.Time = now.format('HH:mm:ss');
-        prizePoolEntry.PrizeId = prize.PrizeId;
-        prizePoolEntry.PrizeDescription = prize.PrizeDescription;
-        prizePoolEntry.Value = prize.PrizeValue;
-        prizePoolEntry.From = 'Gotcha System';
-        prizePoolEntry.To = 'Gotcha HQ';
-        prizePoolEntry.EventType = '24 Hour Timer Ended';
-        prizePoolEntry.Status = 'Active';
-        prizePoolEntry.Notes = '24 Hour Timer Ended - Prize expired automatically';
-        prizePoolEntry.PrizeEntryId = prize._id;
-        
-        const originalEntry = await PrizePoolData.findOne({ 
-          PrizeEntryId: prize._id,
-          EventType: 'Created'
-        });
-        if (originalEntry && originalEntry.PromotionalPeriod) {
-          prizePoolEntry.PromotionalPeriod = originalEntry.PromotionalPeriod;
+          if (existingRollbackEntry) {
+            // Already rolled back this month, skip
+            continue;
+          }
+
+          // Re-activate prize with new month's promotional period
+          prize.Status = 'Active';
+          prize.DropDate = nowAEST.clone().startOf('day').toDate();
+          prize.DropTime = nowAEST.format('HH:mm:ss');
+          await prize.save();
+
+          // Create new "Created" event with new month's promotional period
+          const promoStart = monthStartAEST.clone().add(1, 'second').format('D MMM YYYY h:mm:ss a');
+          const promoEnd = monthEndAEST.clone().subtract(1, 'second').format('D MMM YYYY h:mm:ss a');
+          const timezone = nowAEST.isDST() ? 'AEDT' : 'AEST';
+          
+          const prizePoolEntry = new PrizePoolData();
+          prizePoolEntry.Date = nowAEST.toDate();
+          prizePoolEntry.Time = nowAEST.format('HH:mm:ss');
+          prizePoolEntry.PrizeId = prize.PrizeId;
+          prizePoolEntry.PrizeDescription = prize.PrizeDescription;
+          prizePoolEntry.Value = prize.PrizeValue;
+          prizePoolEntry.From = 'Gotcha System';
+          prizePoolEntry.To = 'Map';
+          prizePoolEntry.EventType = 'Created';
+          prizePoolEntry.Status = 'Active';
+          prizePoolEntry.Notes = `Rolled back to new month - ${promoStart} - ${promoEnd} ${timezone}`;
+          prizePoolEntry.UserId = null;
+          prizePoolEntry.PrizeEntryId = prize._id;
+          prizePoolEntry.PromotionalPeriod = `${promoStart} - ${promoEnd} ${timezone}`;
+          await prizePoolEntry.save();
+
+          rolledBackCount++;
         }
-        
-        await prizePoolEntry.save();
-        expiredCount++;
       }
 
       res.json({
         success: true,
-        message: `Checked and expired ${expiredCount} prize(s)`,
-        data: { expiredCount, totalChecked: expiredPrizes.length }
+        message: `Checked ${activePrizes.length} prize(s): ${rolledBackCount} rolled back to new month`,
+        data: { rolledBackCount, totalChecked: activePrizes.length }
       });
     } catch (error) {
       res.json({
         success: false,
-        message: 'Error checking expired prizes',
+        message: 'Error checking prize rollback',
         data: error
       });
     }
   }
   
-  manualExpireCheck();
+  manualRollbackCheck();
 });
 
 module.exports = {

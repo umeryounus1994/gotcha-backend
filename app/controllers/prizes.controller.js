@@ -279,10 +279,10 @@ exports.markStolen = async function (req, res) {
   }
 };
 
-// Handle 24 hour timer ended
+// Manually expire a prize (admin/manual trigger)
 exports.handleTimerEnded = async function (req, res) {
   const prizeId = req.body.prizeId;
-  const notes = req.body.notes || '24 Hour Timer Ended';
+  const notes = req.body.notes || 'Prize manually expired';
 
   if (!prizeId) {
     return res.json({
@@ -316,16 +316,26 @@ exports.handleTimerEnded = async function (req, res) {
     prizePoolEntry.Value = prize.PrizeValue;
     prizePoolEntry.From = prize.ClaimedBy ? `Player_${prize.ClaimedBy}` : 'Gotcha System';
     prizePoolEntry.To = 'Gotcha HQ';
-    prizePoolEntry.EventType = '24 Hour Timer Ended';
+    prizePoolEntry.EventType = '24 Hour Timer Ended'; // Keep event type for backward compatibility
     prizePoolEntry.Status = 'Active';
     prizePoolEntry.Notes = notes;
     prizePoolEntry.UserId = prize.ClaimedBy || null;
     prizePoolEntry.PrizeEntryId = prize._id;
+    
+    // Preserve promotional period from original entry if exists
+    const originalEntry = await PrizePoolData.findOne({ 
+      PrizeEntryId: prize._id,
+      EventType: 'Created'
+    });
+    if (originalEntry && originalEntry.PromotionalPeriod) {
+      prizePoolEntry.PromotionalPeriod = originalEntry.PromotionalPeriod;
+    }
+    
     await prizePoolEntry.save();
 
     res.json({
       success: true,
-      message: '24 hour timer ended event recorded!',
+      message: 'Prize expired successfully!',
       data: prize,
     });
   } catch (error) {

@@ -3,7 +3,7 @@ const Prizes = require('../models/prizes.model');
 const PrizePoolData = require('../models/prize-pool-data.model');
 const MainPrizePool = require('../models/main-prize-pool.model');
 const rngSelector = require('../utilities/rng-prize-selector');
-const moment = require('moment');
+const moment = require('moment-timezone');
 const excel = require('node-excel-export');
 
 // List all RNG data entries with optional date filtering
@@ -111,11 +111,11 @@ exports.generateDrop = async function (req, res) {
     prizePoolEntry.PrizeEntryId = prize._id;
     prizePoolEntry.RNGDataId = rngEntry._id;
     
-    // Set promotional period (e.g., "30 Oct - 28 Nov 2025")
-    // You can configure this or make it dynamic based on your needs
-    const promoStart = moment().format('D MMM');
-    const promoEnd = moment().add(30, 'days').format('D MMM YYYY');
-    prizePoolEntry.PromotionalPeriod = `${promoStart} - ${promoEnd}`;
+    // Set promotional period to current month in AEST (e.g., "1 Dec 2025 12:00:01 am - 31 Dec 2025 11:59:59 pm AEST")
+    const promoStart = moment().tz('Australia/Sydney').startOf('month').add(1, 'second').format('D MMM YYYY h:mm:ss a');
+    const promoEnd = moment().tz('Australia/Sydney').endOf('month').subtract(1, 'second').format('D MMM YYYY h:mm:ss a');
+    const timezone = moment().tz('Australia/Sydney').isDST() ? 'AEDT' : 'AEST';
+    prizePoolEntry.PromotionalPeriod = `${promoStart} - ${promoEnd} ${timezone}`;
     
     await prizePoolEntry.save();
 

@@ -11,7 +11,7 @@ var OffersHeld = require('./app/models/offer-held.model.js');
 var OffersClaimedModel = require('./app/models/offer-claimed.model.js');
 var Prizes = require('./app/models/prizes.model.js');
 var PrizePoolData = require('./app/models/prize-pool-data.model.js');
-var moment = require('moment'); // require
+var moment = require('moment-timezone'); // require
 moment().format(); 
 global.CronJob = require('./app/cron.js');
 
@@ -98,79 +98,93 @@ function startInterval() {
 
 startInterval();
 
-// Auto-expire prizes after 24 hours
-async function checkAndExpirePrizes() {
+// Check for month changes and rollback prizes to new month (using AEST timezone)
+async function checkAndRollbackPrizes() {
   try {
-    const twentyFourHoursAgo = moment().subtract(24, 'hours').toDate();
-    
-    // Find prizes that are still Active (not claimed), not deleted, and were dropped more than 24 hours ago
-    const expiredPrizes = await Prizes.find({
+    // Find all active, unclaimed prizes
+    const activePrizes = await Prizes.find({
       Status: 'Active',
       IsActive: true,
       IsDeleted: false,
-      ClaimedBy: null, // Only expire unclaimed prizes
-      DropDate: { $lte: twentyFourHoursAgo }
+      ClaimedBy: null // Only check unclaimed prizes
     });
 
-    for (const prize of expiredPrizes) {
-      // Check if a Prize Pool Data entry already exists for this expiration (avoid duplicates)
-      const existingEntry = await PrizePoolData.findOne({
-        PrizeEntryId: prize._id,
-        EventType: '24 Hour Timer Ended'
-      });
+    let rolledBackCount = 0;
+    const nowAEST = moment().tz('Australia/Sydney');
+    const currentMonthAEST = nowAEST.month();
+    const currentYearAEST = nowAEST.year();
 
-      if (existingEntry) {
-        // Already processed, skip
-        continue;
+    for (const prize of activePrizes) {
+      // Check if we're in a different month/year than when the prize was dropped (using AEST)
+      const prizeDropDateAEST = moment(prize.DropDate).tz('Australia/Sydney');
+      const prizeDropMonth = prizeDropDateAEST.month();
+      const prizeDropYear = prizeDropDateAEST.year();
+
+      // If we're in a different month/year, rollback (re-activate) with new month's promotional period
+      if (currentMonthAEST !== prizeDropMonth || currentYearAEST !== prizeDropYear) {
+        // Check if a rollback entry already exists for this month to avoid duplicates
+        const monthStartAEST = nowAEST.clone().startOf('month');
+        const monthEndAEST = nowAEST.clone().endOf('month');
+        
+        const existingRollbackEntry = await PrizePoolData.findOne({
+          PrizeEntryId: prize._id,
+          EventType: 'Created',
+          Date: {
+            $gte: monthStartAEST.toDate(),
+            $lte: monthEndAEST.toDate()
+          }
+        });
+
+        if (existingRollbackEntry) {
+          // Already rolled back this month, skip
+          continue;
+        }
+
+        // Re-activate prize with new month's promotional period
+        prize.Status = 'Active';
+        prize.DropDate = nowAEST.clone().startOf('day').toDate(); // Reset to today in AEST
+        prize.DropTime = nowAEST.format('HH:mm:ss');
+        await prize.save();
+
+        // Create new "Created" event with new month's promotional period
+        const promoStart = monthStartAEST.clone().add(1, 'second').format('D MMM YYYY h:mm:ss a');
+        const promoEnd = monthEndAEST.clone().subtract(1, 'second').format('D MMM YYYY h:mm:ss a');
+        const timezone = nowAEST.isDST() ? 'AEDT' : 'AEST';
+        
+        const prizePoolEntry = new PrizePoolData();
+        prizePoolEntry.Date = nowAEST.toDate();
+        prizePoolEntry.Time = nowAEST.format('HH:mm:ss');
+        prizePoolEntry.PrizeId = prize.PrizeId;
+        prizePoolEntry.PrizeDescription = prize.PrizeDescription;
+        prizePoolEntry.Value = prize.PrizeValue;
+        prizePoolEntry.From = 'Gotcha System';
+        prizePoolEntry.To = 'Map';
+        prizePoolEntry.EventType = 'Created';
+        prizePoolEntry.Status = 'Active';
+        prizePoolEntry.Notes = `Rolled back to new month - ${promoStart} - ${promoEnd} ${timezone}`;
+        prizePoolEntry.UserId = null;
+        prizePoolEntry.PrizeEntryId = prize._id;
+        prizePoolEntry.PromotionalPeriod = `${promoStart} - ${promoEnd} ${timezone}`;
+        await prizePoolEntry.save();
+
+        rolledBackCount++;
+        console.log(`Prize ${prize.PrizeId} rolled back to new month: ${promoStart} - ${promoEnd} ${timezone}`);
       }
-
-      // Update prize status
-      prize.Status = 'Expired';
-      await prize.save();
-
-      // Create Prize Pool Data entry for "24 Hour Timer Ended" event
-      const now = moment();
-      const prizePoolEntry = new PrizePoolData();
-      prizePoolEntry.Date = now.toDate();
-      prizePoolEntry.Time = now.format('HH:mm:ss');
-      prizePoolEntry.PrizeId = prize.PrizeId;
-      prizePoolEntry.PrizeDescription = prize.PrizeDescription;
-      prizePoolEntry.Value = prize.PrizeValue;
-      prizePoolEntry.From = 'Gotcha System';
-      prizePoolEntry.To = 'Gotcha HQ';
-      prizePoolEntry.EventType = '24 Hour Timer Ended';
-      prizePoolEntry.Status = 'Active';
-      prizePoolEntry.Notes = '24 Hour Timer Ended - Prize expired automatically';
-      prizePoolEntry.UserId = null; // Unclaimed prize
-      prizePoolEntry.PrizeEntryId = prize._id;
-      
-      // Preserve promotional period from original entry if exists
-      const originalEntry = await PrizePoolData.findOne({ 
-        PrizeEntryId: prize._id,
-        EventType: 'Created'
-      });
-      if (originalEntry && originalEntry.PromotionalPeriod) {
-        prizePoolEntry.PromotionalPeriod = originalEntry.PromotionalPeriod;
-      }
-      
-      await prizePoolEntry.save();
-      
-      console.log(`Prize ${prize.PrizeId} expired after 24 hours`);
     }
 
-    if (expiredPrizes.length > 0) {
-      console.log(`Auto-expired ${expiredPrizes.length} prize(s) after 24 hours`);
+    if (rolledBackCount > 0) {
+      console.log(`Checked ${activePrizes.length} prize(s): ${rolledBackCount} rolled back to new month`);
     }
   } catch (error) {
-    console.error("Error in checkAndExpirePrizes:", error);
+    console.error("Error in checkAndRollbackPrizes:", error);
   }
 }
 
-function startPrizeExpireInterval() {
-  checkAndExpirePrizes().finally(() => {
-    setTimeout(startPrizeExpireInterval, 3600000); // Check every hour
+function startPrizeRollbackInterval() {
+  checkAndRollbackPrizes().finally(() => {
+    setTimeout(startPrizeRollbackInterval, 3600000); // Check every hour
   });
 }
 
-startPrizeExpireInterval();
+startPrizeRollbackInterval();
 

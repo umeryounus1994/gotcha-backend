@@ -1,11 +1,41 @@
 const PrizePoolData = require('../models/prize-pool-data.model');
-const moment = require('moment');
+const moment = require('moment-timezone');
 const excel = require('node-excel-export');
 const mongoose = require('mongoose');
 
 // List all prize pool data entries with optional date filtering
 exports.list = function (req, res) {
   const query = { IsDeleted: false };
+  
+  // Promotional period filtering (current month, next month, or specific month)
+  if (req.query.promotionalPeriod) {
+    const period = req.query.promotionalPeriod.toLowerCase();
+    const nowAEST = moment().tz('Australia/Sydney');
+    
+    if (period === 'current' || period === 'currentmonth') {
+      // Filter by current month's promotional period
+      const monthStart = nowAEST.clone().startOf('month').add(1, 'second');
+      const monthEnd = nowAEST.clone().endOf('month').subtract(1, 'second');
+      const timezone = nowAEST.isDST() ? 'AEDT' : 'AEST';
+      const promoStartStr = monthStart.format('D MMM YYYY h:mm:ss a');
+      const promoEndStr = monthEnd.format('D MMM YYYY h:mm:ss a');
+      const promoPeriodPattern = `${promoStartStr} - ${promoEndStr} ${timezone}`;
+      query.PromotionalPeriod = promoPeriodPattern;
+    } else if (period === 'next' || period === 'nextmonth') {
+      // Filter by next month's promotional period
+      const nextMonth = nowAEST.clone().add(1, 'month');
+      const monthStart = nextMonth.clone().startOf('month').add(1, 'second');
+      const monthEnd = nextMonth.clone().endOf('month').subtract(1, 'second');
+      const timezone = nextMonth.isDST() ? 'AEDT' : 'AEST';
+      const promoStartStr = monthStart.format('D MMM YYYY h:mm:ss a');
+      const promoEndStr = monthEnd.format('D MMM YYYY h:mm:ss a');
+      const promoPeriodPattern = `${promoStartStr} - ${promoEndStr} ${timezone}`;
+      query.PromotionalPeriod = promoPeriodPattern;
+    } else {
+      // Custom promotional period string match
+      query.PromotionalPeriod = { $regex: req.query.promotionalPeriod, $options: 'i' };
+    }
+  }
   
   // Date filtering
   if (req.query.startDate && req.query.endDate) {
@@ -120,9 +150,101 @@ exports.update = function (req, res) {
   });
 };
 
+// Get claimed prizes by month (current month or next month)
+exports.getClaimedByMonth = function (req, res) {
+  const query = { 
+    IsDeleted: false,
+    EventType: 'Claimed' // Only get claimed prizes
+  };
+  
+  const month = req.query.month ? req.query.month.toLowerCase() : 'current';
+  const nowAEST = moment().tz('Australia/Sydney');
+  
+  let monthStart, monthEnd, timezone, promoPeriodPattern;
+  
+  if (month === 'current' || month === 'currentmonth') {
+    // Current month
+    monthStart = nowAEST.clone().startOf('month').add(1, 'second');
+    monthEnd = nowAEST.clone().endOf('month').subtract(1, 'second');
+    timezone = nowAEST.isDST() ? 'AEDT' : 'AEST';
+  } else if (month === 'next' || month === 'nextmonth') {
+    // Next month
+    const nextMonth = nowAEST.clone().add(1, 'month');
+    monthStart = nextMonth.clone().startOf('month').add(1, 'second');
+    monthEnd = nextMonth.clone().endOf('month').subtract(1, 'second');
+    timezone = nextMonth.isDST() ? 'AEDT' : 'AEST';
+  } else {
+    // Invalid month parameter
+    return res.json({
+      success: false,
+      message: 'Invalid month parameter. Use "current" or "next"',
+      data: null,
+    });
+  }
+  
+  promoPeriodPattern = `${monthStart.format('D MMM YYYY h:mm:ss a')} - ${monthEnd.format('D MMM YYYY h:mm:ss a')} ${timezone}`;
+  query.PromotionalPeriod = promoPeriodPattern;
+  
+  PrizePoolData.find(query)
+    .populate('UserId', 'FullName Email')
+    .populate('PrizeEntryId', 'PrizeId PrizeDescription')
+    .sort({ Date: -1, Time: -1 })
+    .exec(function (err, data) {
+      if (err) {
+        res.json({
+          success: false,
+          message: 'Server Error',
+          data: err,
+        });
+      } else {
+        const totalValue = data.reduce((sum, entry) => sum + (entry.Value || 0), 0);
+        const uniqueUsers = new Set();
+        data.forEach(entry => {
+          if (entry.UserId) {
+            uniqueUsers.add(entry.UserId._id.toString());
+          }
+        });
+        
+        res.json({
+          success: true,
+          message: `${data.length} claimed prize(s) found for ${month} month`,
+          data: {
+            prizes: data,
+            count: data.length,
+            totalValue: totalValue,
+            uniqueUsers: uniqueUsers.size,
+            promotionalPeriod: promoPeriodPattern,
+            month: month
+          },
+        });
+      }
+    });
+};
+
 // Get prize pool data statistics
 exports.getStats = function (req, res) {
   const query = { IsDeleted: false };
+  
+  // Promotional period filtering
+  if (req.query.promotionalPeriod) {
+    const period = req.query.promotionalPeriod.toLowerCase();
+    const nowAEST = moment().tz('Australia/Sydney');
+    
+    if (period === 'current' || period === 'currentmonth') {
+      const monthStart = nowAEST.clone().startOf('month').add(1, 'second');
+      const monthEnd = nowAEST.clone().endOf('month').subtract(1, 'second');
+      const timezone = nowAEST.isDST() ? 'AEDT' : 'AEST';
+      const promoPeriodPattern = `${monthStart.format('D MMM YYYY h:mm:ss a')} - ${monthEnd.format('D MMM YYYY h:mm:ss a')} ${timezone}`;
+      query.PromotionalPeriod = promoPeriodPattern;
+    } else if (period === 'next' || period === 'nextmonth') {
+      const nextMonth = nowAEST.clone().add(1, 'month');
+      const monthStart = nextMonth.clone().startOf('month').add(1, 'second');
+      const monthEnd = nextMonth.clone().endOf('month').subtract(1, 'second');
+      const timezone = nextMonth.isDST() ? 'AEDT' : 'AEST';
+      const promoPeriodPattern = `${monthStart.format('D MMM YYYY h:mm:ss a')} - ${monthEnd.format('D MMM YYYY h:mm:ss a')} ${timezone}`;
+      query.PromotionalPeriod = promoPeriodPattern;
+    }
+  }
   
   // Date filtering
   if (req.query.startDate && req.query.endDate) {
