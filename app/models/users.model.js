@@ -114,6 +114,11 @@ const userSchema = new schema({
     type: Boolean,
     default: false,
   },
+  AffiliateId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'affiliates',
+    default: null,
+  },
   CreationTimestamp: {
     type: Date,
     default: Date.now,

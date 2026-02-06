@@ -3,6 +3,7 @@ const authRoutes = require("express").Router();
 const mediaUpload = require("../utilities/media_upload");
 var admin = require('firebase-admin');
 let Users = require("../models/users.model");
+let Affiliates = require("../models/affiliate.model");
 let jwt = require("jsonwebtoken");
 var serviceAccount = require("../tagtap-firebase-adminsdk.json");
 admin.initializeApp({
@@ -34,7 +35,9 @@ const prizesController = require("../controllers/prizes.controller");
 const rngDataController = require("../controllers/rng-data.controller");
 const prizePoolDataController = require("../controllers/prize-pool-data.controller");
 const regulatorController = require("../controllers/regulator.controller");
+const affiliateController = require("../controllers/affiliate.controller");
 const validation = require("../middleware/validation");
+const Token = require("../token");
 let Offers = require('../models/offers.model');
 var user =require('../models/users.model.js');
 const bcrypt = require("bcrypt");
@@ -174,6 +177,29 @@ authRoutes
 authRoutes
   .route("/sponsors/forgetPassword")
   .post(sponsorsController.forgetPassword);
+
+// Affiliates (public login; dashboard requires affiliate JWT):
+authRoutes.route("/affiliates/login").post(affiliateController.login);
+authRoutes.route("/affiliates/dashboard").get(Token.checkToken, affiliateController.dashboard);
+
+// Internal API key middleware (optional: set INTERNAL_API_KEY in .env to protect internal routes)
+function requireInternalKey(req, res, next) {
+  var key = req.headers["x-internal-api-key"] || req.headers["X-Internal-Api-Key"];
+  if (process.env.INTERNAL_API_KEY && key !== process.env.INTERNAL_API_KEY) {
+    return res.status(403).json({ success: false, message: "Forbidden", data: null });
+  }
+  next();
+}
+
+// Internal affiliate management (require x-internal-api-key if INTERNAL_API_KEY is set):
+// Define /sales and /addSale before /:id so "sales" is not matched as an id
+authRoutes.route("/internal/affiliates").get(requireInternalKey, affiliateController.listInternal);
+authRoutes.route("/internal/affiliates/sales").get(requireInternalKey, affiliateController.salesInternal);
+authRoutes.route("/internal/affiliates").post(requireInternalKey, affiliateController.createInternal);
+authRoutes.route("/internal/affiliates/update").post(requireInternalKey, affiliateController.updateInternal);
+authRoutes.route("/internal/affiliates/delete").post(requireInternalKey, affiliateController.deleteInternal);
+authRoutes.route("/internal/affiliates/addSale").post(requireInternalKey, affiliateController.addSaleInternal);
+authRoutes.route("/internal/affiliates/:id").get(requireInternalKey, affiliateController.getOneInternal);
 
 // Offer Types:
 authRoutes.post('/offerTypes',
@@ -454,8 +480,37 @@ async function (req, res) {
           user.PurchasePackage = req.body.PurchasePackage || false;
           user.PurchasePackageExpired = req.body.PurchasePackageExpired || true;
           user.PackageDate = req.body.PackageDate || "",
-          user.PackageExpiryDate = req.body.PackageExpiryDate || ""
-
+          user.PackageExpiryDate = req.body.PackageExpiryDate || "";
+          var trackingID = (req.body.TrackingID || req.body.trackingId || "").trim();
+          if (trackingID) {
+            Affiliates.findOne({ TrackingID: trackingID, Status: "ACTIVE" }, function (errA, aff) {
+              if (!errA && aff) user.AffiliateId = aff._id;
+              user.save(async function (err) {
+                if (err) {
+                  res.json({ success: false, message: "Server Error", data: err });
+                } else {
+                  const customer = await client.customers.create({
+                    idempotencyKey: uuidv4(),
+                    emailAddress: req.body.Email.toLowerCase().trim()
+                  });
+                  if (customer?.customer?.id) {
+                    usersController.updateUserProfile(user._id, { SquareCustomerId: customer?.customer?.id }, { new: true }, async function (err, result) {});
+                  }
+                  let userData = {
+                    Id: user._id,
+                    Name: user.FullName,
+                    ContactNumber: user.ContactNumber,
+                    Email: user.Email,
+                    ProfilePicture: user.ProfilePicture,
+                    AccountNumber: user.AccountNumber,
+                    BSB: user.BSB,
+                  };
+                  let token = jwt.sign(userData, Constants.JWT.secret, { expiresIn: "10d" });
+                  res.json({ success: true, message: "Successfully registered!", data: userData, token: token });
+                }
+              });
+            });
+          } else {
           user.save(async function (err) {
             if (err) {
               res.json({
@@ -497,11 +552,11 @@ async function (req, res) {
               });
             }
           });
+          }
         });
       }
     }
   });
-
 });
 
 

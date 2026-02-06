@@ -1,5 +1,6 @@
 let Users = require("../models/users.model");
 let UserCoins = require("../models/user-coins.model");
+const Affiliates = require("../models/affiliate.model");
 let Offers = require("../models/offers.model");
 let OffersClaimedModel = require('../models/offer-claimed.model');
 const PackagesModel = require("../models/packages.model");
@@ -126,6 +127,7 @@ exports.signup = function (req, res) {
   var PostCode = req.body.PostCode;
   var Gender = req.body.Gender;
   var ContactNumber = req.body.ContactNumber;
+  var TrackingID = req.body.TrackingID || req.body.trackingId || null;
 
   Users.findOne({ Email: Email }, function (err, exist) {
     if (err) {
@@ -154,8 +156,15 @@ exports.signup = function (req, res) {
           user.PostCode = PostCode;
           user.Gender = Gender;
           user.ContactNumber = ContactNumber;
-
-          user.save(function (err) {
+          if (TrackingID) {
+            Affiliates.findOne({ TrackingID: TrackingID.trim(), Status: 'ACTIVE' }, function (errA, aff) {
+              if (!errA && aff) user.AffiliateId = aff._id;
+              user.save(saveCb);
+            });
+          } else {
+            user.save(saveCb);
+          }
+          function saveCb(err) {
             if (err) {
               res.json({
                 success: false,
@@ -197,7 +206,7 @@ exports.signup = function (req, res) {
                 token: token,
               });
             }
-          });
+          }
         });
       }
     }
