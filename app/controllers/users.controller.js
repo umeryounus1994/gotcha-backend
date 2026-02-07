@@ -5,6 +5,7 @@ let Offers = require("../models/offers.model");
 let OffersClaimedModel = require('../models/offer-claimed.model');
 const PackagesModel = require("../models/packages.model");
 const UserCards = require("../models/user-card.model");
+const AffiliateSale = require("../models/affiliate-sale.model");
 
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
@@ -1213,6 +1214,14 @@ exports.purchaseBankFulPackage = async function (req, res) {
       userCoins.BankfulResponse.push(paymentData);
 
       await userCoins.save();
+      if (getUser.AffiliateId) {
+        const sale = new AffiliateSale({
+          AffiliateId: getUser.AffiliateId,
+          Amount: Number(amount) || 0,
+          UserId: userId,
+        });
+        sale.save().catch((err) => console.error("AffiliateSale save error:", err));
+      }
       await mailer.sendMailReceipt(getUser?.Email, getUser?.FullName, paymentData?.receipt_url);
       return res.json({
         status: true,
@@ -1227,6 +1236,14 @@ exports.purchaseBankFulPackage = async function (req, res) {
       findUserCoins.BankfulResponse.push(paymentData);
       await mailer.sendMailReceipt(getUser?.Email, getUser?.FullName, paymentData?.receipt_url);
       await findUserCoins.save();
+      if (getUser.AffiliateId) {
+        const sale = new AffiliateSale({
+          AffiliateId: getUser.AffiliateId,
+          Amount: Number(amount) || 0,
+          UserId: userId,
+        });
+        sale.save().catch((err) => console.error("AffiliateSale save error:", err));
+      }
       return res.json({
         status: true,
         message: "Package purchased"
