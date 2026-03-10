@@ -26,6 +26,7 @@ const usersController = require("../controllers/users.controller");
 const userCoinDetailsController = require("../controllers/user-coin-details.controller");
 const sponsorsController = require("../controllers/sponsors.controller");
 const packagesController = require("../controllers/packages.controller");
+const fulfillmentPackagesController = require("../controllers/fulfillment-packages.controller");
 const offersController = require("../controllers/offers.controller");
 const setupController = require("../controllers/setup.controller");
 const dashboardController = require("../controllers/dashboard.controller");
@@ -36,6 +37,9 @@ const rngDataController = require("../controllers/rng-data.controller");
 const prizePoolDataController = require("../controllers/prize-pool-data.controller");
 const regulatorController = require("../controllers/regulator.controller");
 const affiliateController = require("../controllers/affiliate.controller");
+const userPrizesController = require("../controllers/user-prizes.controller");
+const prizeOrdersController = require("../controllers/prize-orders.controller");
+const idVerificationController = require("../controllers/id-verification.controller");
 const validation = require("../middleware/validation");
 const Token = require("../token");
 let Offers = require('../models/offers.model');
@@ -686,6 +690,26 @@ authRoutes.route("/users/forgetPassword").post(usersController.forgetPassword);
 authRoutes.route("/users/updatePassword").post(usersController.updatePassword);
 authRoutes.route("/users/socialLogin").post(usersController.socialLogin);
 authRoutes.route("/users/getSingleUserDetails").post(usersController.getSingleUserDetails);
+authRoutes.route("/users/fulfillment-subscribe").post(Token.checkToken, usersController.fulfillmentSubscribe);
+authRoutes.route("/users/cancel-fulfillment-subscription").post(Token.checkToken, usersController.cancelFulfillmentSubscription);
+authRoutes.route("/users/fulfillment-plan").get(Token.checkToken, usersController.getFulfillmentPlan);
+authRoutes.route("/users/team/invite").post(Token.checkToken, usersController.inviteTeamMember);
+authRoutes.route("/users/team/sync").post(Token.checkToken, usersController.syncTeamMembership);
+authRoutes.route("/users/team").get(Token.checkToken, usersController.listTeam);
+authRoutes.route("/users/invoices").get(usersController.listInvoices);
+router.route("/users/invoices").get(Token.checkToken, usersController.listInvoices);
+
+// ID Verification (KYC)
+router.post(
+  "/users/id-verification/upload",
+  idVerificationController.uploadMiddleware,
+  idVerificationController.upload
+);
+router.post("/users/id-verification/submit", Token.checkToken, idVerificationController.submit);
+router.get("/users/id-verification/status", Token.checkToken, idVerificationController.getStatus);
+authRoutes.route("/id-verification").get(idVerificationController.list);
+authRoutes.route("/id-verification/:id").get(idVerificationController.getOne);
+authRoutes.route("/id-verification/:id/decision").post(idVerificationController.decision);
 
 // userCoinDetails (view)
 authRoutes.route("/users/system-leader-board").get(userCoinDetailsController.list);
@@ -712,6 +736,21 @@ mediaUpload.fields([
 ]),
 packagesController.update);
 authRoutes.route("/packages/delete/:Id").post(packagesController.delete);
+
+// Fulfillment Packages (Rookie / Hustler / Boss tiers for prize fulfillment):
+authRoutes.route("/fulfillment-packages").get(fulfillmentPackagesController.list);
+authRoutes.route("/fulfillment-packages/:Id").get(fulfillmentPackagesController.getById);
+authRoutes.post(
+  "/fulfillment-packages/add",
+  mediaUpload.fields([{ name: "Image", maxCount: 1 }]),
+  fulfillmentPackagesController.add
+);
+authRoutes.post(
+  "/fulfillment-packages/update",
+  mediaUpload.fields([{ name: "Image", maxCount: 1 }]),
+  fulfillmentPackagesController.update
+);
+authRoutes.route("/fulfillment-packages/delete/:Id").post(fulfillmentPackagesController.delete);
 
 // Dashboard:
 authRoutes.route("/dashboard/statsAdmin").get(dashboardController.statsAdmin);
@@ -808,6 +847,17 @@ router.route("/prizes/:id").get(prizesController.getById);
 authRoutes.route("/prizes").get(prizesController.list);
 authRoutes.route("/prizes/mark-stolen").post(prizesController.markStolen);
 authRoutes.route("/prizes/timer-ended").post(prizesController.handleTimerEnded);
+
+// User Prizes (link between users and prizes: active / secured / processing / shipped)
+router.route("/user-prizes/active").get(Token.checkToken, userPrizesController.listActive);
+router.route("/user-prizes/secured").get(Token.checkToken, userPrizesController.listSecured);
+router.route("/user-prizes/move-to-secured").post(Token.checkToken, userPrizesController.moveToSecured);
+router.route("/user-prizes/process").post(Token.checkToken, userPrizesController.processPrize);
+router.route("/user-prizes/:id/tracking").get(Token.checkToken, userPrizesController.getTracking);
+
+// Prize Orders (admin fulfillment window)
+authRoutes.route("/prize-orders").get(prizeOrdersController.list);
+authRoutes.route("/prize-orders/:id/send-to-shopify").post(prizeOrdersController.sendToShopify);
 
 // RNG Data (Admin/Regulator):
 authRoutes.route("/rng-data").get(rngDataController.list);

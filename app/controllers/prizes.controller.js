@@ -1,6 +1,7 @@
 const Prizes = require('../models/prizes.model');
 const PrizePoolData = require('../models/prize-pool-data.model');
 const Users = require('../models/users.model');
+const UserPrize = require('../models/user-prize.model');
 const moment = require('moment');
 
 // List all prizes (with optional filters)
@@ -158,10 +159,32 @@ exports.claim = async function (req, res) {
     prizePoolEntry.PrizeEntryId = prize._id;
     await prizePoolEntry.save();
 
+    // Create or update UserPrize entry for this user/prize (active state)
+    let userPrize = await UserPrize.findOne({
+      UserId: userId,
+      PrizeId: prize._id,
+      IsDeleted: false,
+    });
+
+    if (!userPrize) {
+      userPrize = new UserPrize({
+        UserId: userId,
+        PrizeId: prize._id,
+        Status: 'active',
+      });
+    } else {
+      userPrize.Status = 'active';
+      userPrize.IsDeleted = false;
+    }
+    await userPrize.save();
+
     res.json({
       success: true,
       message: 'Prize successfully claimed!',
-      data: prize,
+      data: {
+        prize,
+        userPrize,
+      },
     });
   } catch (error) {
     res.json({

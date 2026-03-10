@@ -106,6 +106,28 @@ const userSchema = new schema({
     type: Boolean
   },
   // @Umer New Fields End
+  // Fulfillment subscription / tiers (Rookie, Hustler, Boss)
+  FulfillmentPackageId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'fulfillment-packages',
+    default: null,
+  },
+  FulfillmentSubscriptionStartedAt: {
+    type: Date,
+    default: null,
+  },
+  FulfillmentSubscriptionEndsAt: {
+    type: Date,
+    default: null,
+  },
+  BossUnlockEligibleAt: {
+    type: Date,
+    default: null,
+  },
+  BossUnlocked: {
+    type: Boolean,
+    default: false,
+  },
   IsActive: {
     type: Boolean,
     default: true,

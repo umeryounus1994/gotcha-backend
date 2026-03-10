@@ -6,6 +6,9 @@ let OffersClaimedModel = require('../models/offer-claimed.model');
 const PackagesModel = require("../models/packages.model");
 const UserCards = require("../models/user-card.model");
 const AffiliateSale = require("../models/affiliate-sale.model");
+const FulfillmentPackage = require("../models/fulfillment-package.model");
+const UserTeam = require("../models/user-team.model");
+const IdVerification = require("../models/id-verification.model");
 
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
@@ -1172,6 +1175,7 @@ exports.purchaseBankFulPackage = async function (req, res) {
     paymentData,
     amount,
     userId,
+    fulfillmentPackageId: bodyFulfillmentPackageId,
   } = req.body;
 
   const missingFields = [];
@@ -1202,9 +1206,71 @@ exports.purchaseBankFulPackage = async function (req, res) {
         data: null,
       });
     }
+
+    // Link to fulfillment package: from request body or from coin package
+    const linkedFulfillmentId = bodyFulfillmentPackageId || packageData.FulfillmentPackageId;
+    if (linkedFulfillmentId) {
+      const pkg = await FulfillmentPackage.findOne({
+        _id: linkedFulfillmentId,
+        IsDeleted: false,
+      });
+      if (pkg) {
+        const now = momenttz();
+        const subscriptionEndsAt = now.clone().add(7, "days").toDate();
+        getUser.FulfillmentPackageId = pkg._id;
+        getUser.FulfillmentSubscriptionStartedAt = getUser.FulfillmentSubscriptionStartedAt || now.toDate();
+        getUser.FulfillmentSubscriptionEndsAt = subscriptionEndsAt;
+
+        const pkgName = (pkg.Name || "").toLowerCase();
+        if (pkgName === "boss") {
+          let hasTimeUnlock = false;
+          if (getUser.BossUnlockEligibleAt) {
+            hasTimeUnlock = momenttz(getUser.BossUnlockEligibleAt).isSameOrBefore(now);
+          }
+          const teamEntries = await UserTeam.find({
+            OwnerUserId: getUser._id,
+            Status: "joined",
+          }).populate("JoinedUserId");
+          let activeHustlers = 0;
+          for (const entry of teamEntries) {
+            const member = entry.JoinedUserId;
+            if (!member || !member.FulfillmentPackageId) continue;
+            const memberPkg = await FulfillmentPackage.findById(member.FulfillmentPackageId);
+            if (
+              memberPkg &&
+              (memberPkg.Name || "").toLowerCase() === "hustler" &&
+              member.FulfillmentSubscriptionEndsAt &&
+              momenttz(member.FulfillmentSubscriptionEndsAt).isAfter(now)
+            ) {
+              activeHustlers++;
+            }
+          }
+          const hasTeamUnlock = activeHustlers >= 4;
+          if (!hasTimeUnlock && !hasTeamUnlock && !getUser.BossUnlocked) {
+            return res.status(403).json({
+              success: false,
+              message: "Boss plan is locked. Reach the Boss unlock date or have 4 active Hustlers.",
+              data: { bossUnlockEligibleAt: getUser.BossUnlockEligibleAt, activeHustlers },
+            });
+          }
+          if (hasTeamUnlock) getUser.BossUnlocked = true;
+        }
+        if (pkgName === "hustler") {
+          const existingBossDate = getUser.BossUnlockEligibleAt
+            ? momenttz(getUser.BossUnlockEligibleAt)
+            : null;
+          const hustlerBossDate = now.clone().add(pkg.MinPaidWeeksForBoss || 4, "weeks");
+          getUser.BossUnlockEligibleAt = existingBossDate
+            ? momenttz.max(existingBossDate, hustlerBossDate).toDate()
+            : hustlerBossDate.toDate();
+        }
+        await getUser.save();
+      }
+    }
+
     var findUserCoins = await UserCoins.findOne({ UserId: userId });
     if (!findUserCoins) {
-      var userCoins = new UserCoins(); 
+      var userCoins = new UserCoins();
       userCoins.UserId = userId;
       userCoins.HeldCoins = packageData?.Coins || 0;
       userCoins.BonusCoins = packageData?.FreeCoins || 0;
@@ -1226,7 +1292,7 @@ exports.purchaseBankFulPackage = async function (req, res) {
       return res.json({
         status: true,
         message: "Package purchased"
-      })
+      });
     } else {
       findUserCoins.HeldCoins += packageData?.Coins || 0;
       findUserCoins.BonusCoins += packageData?.FreeCoins || 0;
@@ -1247,7 +1313,7 @@ exports.purchaseBankFulPackage = async function (req, res) {
       return res.json({
         status: true,
         message: "Package purchased"
-      })
+      });
     }
   } catch (error) {
     return res.status(400).json({
@@ -1453,5 +1519,405 @@ exports.registerCustomer = async function (req, res) {
     } else {
       console.log("Unexpected error occurred: ", error);
     }
+  }
+};
+
+// Fulfillment subscription: assign Rookie/Hustler/Boss plan to user
+exports.fulfillmentSubscribe = async function (req, res) {
+  try {
+    const { fulfillmentPackageId } = req.body;
+    const decoded = req.decoded || {};
+    const userId = decoded.Id || decoded.id || decoded._id || req.body.userId || req.body.UserId;
+
+    if (!userId || !fulfillmentPackageId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId and fulfillmentPackageId are required",
+      });
+    }
+
+    const user = await Users.findById(userId);
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const pkg = await FulfillmentPackage.findOne({
+      _id: fulfillmentPackageId,
+      IsDeleted: false,
+    });
+    if (!pkg) {
+      return res.status(400).json({
+        success: false,
+        message: "Fulfillment package not found",
+      });
+    }
+
+    const idVerification = await IdVerification.findOne({
+      UserId: userId,
+      Status: "approved",
+    });
+    if (!idVerification) {
+      return res.status(403).json({
+        success: false,
+        message: "ID verification must be approved before subscribing to a fulfillment plan. Please complete and submit ID verification first.",
+        code: "ID_VERIFICATION_REQUIRED",
+      });
+    }
+
+    const now = momenttz();
+    const subscriptionEndsAt = now.clone().add(7, "days").toDate();
+
+    user.FulfillmentPackageId = pkg._id;
+    user.FulfillmentSubscriptionStartedAt = now.toDate();
+    user.FulfillmentSubscriptionEndsAt = subscriptionEndsAt;
+
+    const pkgName = (pkg.Name || "").toLowerCase();
+
+    // Enforce Boss unlock rules: Boss package can only be activated when
+    // boss unlock date has passed OR the user has a team of 4 active Hustlers.
+    if (pkgName === "boss") {
+      const nowDate = now.toDate();
+      let hasTimeUnlock = false;
+      if (user.BossUnlockEligibleAt) {
+        hasTimeUnlock = momenttz(user.BossUnlockEligibleAt).isSameOrBefore(
+          now
+        );
+      }
+
+      // Count team members who have joined and are currently Hustlers
+      const teamEntries = await UserTeam.find({
+        OwnerUserId: user._id,
+        Status: "joined",
+      }).populate("JoinedUserId");
+
+      let activeHustlers = 0;
+      for (const entry of teamEntries) {
+        const member = entry.JoinedUserId;
+        if (!member || !member.FulfillmentPackageId) continue;
+        const memberPkg = await FulfillmentPackage.findById(
+          member.FulfillmentPackageId
+        );
+        if (
+          memberPkg &&
+          (memberPkg.Name || "").toLowerCase() === "hustler" &&
+          member.FulfillmentSubscriptionEndsAt &&
+          momenttz(member.FulfillmentSubscriptionEndsAt).isAfter(now)
+        ) {
+          activeHustlers++;
+        }
+      }
+
+      const hasTeamUnlock = activeHustlers >= 4;
+
+      if (!hasTimeUnlock && !hasTeamUnlock && !user.BossUnlocked) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Boss plan is locked. You must reach the Boss unlock date or have a team of 4 active Hustlers.",
+          data: {
+            bossUnlockEligibleAt: user.BossUnlockEligibleAt,
+            activeHustlers,
+          },
+        });
+      }
+
+      if (hasTeamUnlock) {
+        user.BossUnlocked = true;
+      }
+    }
+
+    if (pkgName === "hustler") {
+      const existingBossDate = user.BossUnlockEligibleAt
+        ? momenttz(user.BossUnlockEligibleAt)
+        : null;
+      const hustlerBossDate = now
+        .clone()
+        .add(pkg.MinPaidWeeksForBoss || 4, "weeks");
+      user.BossUnlockEligibleAt = existingBossDate
+        ? momenttz.max(existingBossDate, hustlerBossDate).toDate()
+        : hustlerBossDate.toDate();
+    }
+
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: "Fulfillment subscription updated",
+      data: {
+        FulfillmentPackageId: user.FulfillmentPackageId,
+        FulfillmentSubscriptionStartedAt: user.FulfillmentSubscriptionStartedAt,
+        FulfillmentSubscriptionEndsAt: user.FulfillmentSubscriptionEndsAt,
+        BossUnlockEligibleAt: user.BossUnlockEligibleAt,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update fulfillment subscription",
+      data: error.message || error,
+    });
+  }
+};
+
+exports.cancelFulfillmentSubscription = async function (req, res) {
+  try {
+    const decoded = req.decoded || {};
+    const userId = decoded.Id || decoded.id || decoded._id || req.body.userId || req.body.UserId;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId is required",
+      });
+    }
+
+    const user = await Users.findById(userId);
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    if (!user.FulfillmentPackageId) {
+      return res.status(400).json({
+        success: false,
+        message: "User does not have an active fulfillment subscription",
+      });
+    }
+
+    const now = momenttz();
+    if (
+      !user.FulfillmentSubscriptionEndsAt ||
+      momenttz(user.FulfillmentSubscriptionEndsAt).isBefore(now)
+    ) {
+      user.FulfillmentSubscriptionEndsAt = now.toDate();
+    }
+
+    await user.save();
+
+    return res.json({
+      success: true,
+      message:
+        "Fulfillment subscription will end at the current period end date",
+      data: {
+        FulfillmentSubscriptionEndsAt: user.FulfillmentSubscriptionEndsAt,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to cancel fulfillment subscription",
+      data: error.message || error,
+    });
+  }
+};
+
+exports.getFulfillmentPlan = async function (req, res) {
+  try {
+    const decoded = req.decoded || {};
+    const userId =
+      decoded.Id || decoded.id || decoded._id || req.query.userId || req.query.UserId;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId is required",
+      });
+    }
+
+    const user = await Users.findById(userId).populate("FulfillmentPackageId");
+    if (!user || !user.FulfillmentPackageId) {
+      return res.json({
+        success: false,
+        message: "User does not have a fulfillment plan",
+        data: null,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Fulfillment plan",
+      data: {
+        package: user.FulfillmentPackageId,
+        subscriptionStartedAt: user.FulfillmentSubscriptionStartedAt,
+        subscriptionEndsAt: user.FulfillmentSubscriptionEndsAt,
+        bossUnlockEligibleAt: user.BossUnlockEligibleAt,
+        bossUnlocked: user.BossUnlocked,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get fulfillment plan",
+      data: error.message || error,
+    });
+  }
+};
+
+exports.inviteTeamMember = async function (req, res) {
+  try {
+    const decoded = req.decoded || {};
+    const ownerUserId =
+      decoded.Id || decoded.id || decoded._id || req.body.ownerUserId;
+    const { email } = req.body;
+    if (!ownerUserId || !email) {
+      return res.status(400).json({
+        success: false,
+        message: "ownerUserId and email are required",
+      });
+    }
+
+    const owner = await Users.findById(ownerUserId);
+    if (!owner) {
+      return res.status(400).json({
+        success: false,
+        message: "Owner user not found",
+      });
+    }
+
+    const normalizedEmail = String(email).toLowerCase().trim();
+    let teamEntry = await UserTeam.findOne({
+      OwnerUserId: ownerUserId,
+      InvitedEmail: normalizedEmail,
+    });
+
+    if (!teamEntry) {
+      teamEntry = new UserTeam({
+        OwnerUserId: ownerUserId,
+        InvitedEmail: normalizedEmail,
+      });
+      await teamEntry.save();
+    }
+
+    return res.json({
+      success: true,
+      message: "Team member invited (or already invited)",
+      data: teamEntry,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to invite team member",
+      data: error.message || error,
+    });
+  }
+};
+
+exports.syncTeamMembership = async function (req, res) {
+  try {
+    const decoded = req.decoded || {};
+    const userId =
+      decoded.Id || decoded.id || decoded._id || req.body.userId || req.body.UserId;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId is required",
+      });
+    }
+
+    const user = await Users.findById(userId);
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const email = String(user.Email || "").toLowerCase().trim();
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "User does not have an email",
+      });
+    }
+
+    const updated = await UserTeam.updateMany(
+      {
+        InvitedEmail: email,
+        Status: "invited",
+      },
+      {
+        $set: {
+          JoinedUserId: user._id,
+          Status: "joined",
+        },
+      }
+    );
+
+    return res.json({
+      success: true,
+      message: "Team membership synced",
+      data: updated,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to sync team membership",
+      data: error.message || error,
+    });
+  }
+};
+
+exports.listTeam = async function (req, res) {
+  try {
+    const decoded = req.decoded || {};
+    const ownerUserId =
+      decoded.Id || decoded.id || decoded._id || req.query.ownerUserId;
+    if (!ownerUserId) {
+      return res.status(400).json({
+        success: false,
+        message: "ownerUserId is required",
+      });
+    }
+
+    const entries = await UserTeam.find({
+      OwnerUserId: ownerUserId,
+    }).populate("JoinedUserId", "FullName Email");
+
+    return res.json({
+      success: true,
+      message: "Team members",
+      data: entries,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to list team members",
+      data: error.message || error,
+    });
+  }
+};
+
+// Simple invoices list based on stored BankfulResponse entries
+exports.listInvoices = async function (req, res) {
+  try {
+    const decoded = req.decoded || {};
+    const userId =
+      decoded.Id || decoded.id || decoded._id || req.query.userId || req.query.UserId;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId is required",
+      });
+    }
+
+    const userCoins = await UserCoins.findOne({ UserId: userId });
+    const invoices = (userCoins && Array.isArray(userCoins.BankfulResponse))
+      ? userCoins.BankfulResponse
+      : [];
+
+    return res.json({
+      success: true,
+      message: `${invoices.length} invoice(s)`,
+      data: invoices,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to list invoices",
+      data: error.message || error,
+    });
   }
 };

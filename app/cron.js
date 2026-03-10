@@ -3,6 +3,8 @@ const Cron = require('./backup.js');
 const MainPrizePool = require('./models/main-prize-pool.model');
 const Prizes = require('./models/prizes.model');
 const PrizePoolData = require('./models/prize-pool-data.model');
+const UserPrize = require('./models/user-prize.model');
+const fetch = require('node-fetch');
 const moment = require('moment-timezone');
 
 // AutoBackUp every week (at 00:00 on Sunday - Australian time)
@@ -128,4 +130,112 @@ new CronJob(
   null,
   true,
   'Australia/Sydney' // Australian Eastern Time (AEST/AEDT)
+);
+
+// Periodic check: move secured prizes into waiting/processing when their ProcessingStartsAt has passed
+new CronJob(
+  '0 */10 * * * *', // every 10 minutes
+  async function () {
+    try {
+      const now = moment().toDate();
+
+      const candidates = await UserPrize.find({
+        Status: 'secured',
+        ProcessingStartsAt: { $ne: null, $lte: now },
+        IsDeleted: false,
+      });
+
+      if (!candidates.length) {
+        return;
+      }
+
+      for (const item of candidates) {
+        item.Status = 'waiting';
+        await item.save();
+      }
+
+      console.log(
+        `UserPrize cron: moved ${candidates.length} secured prize(s) to waiting`
+      );
+    } catch (error) {
+      console.error('Error in UserPrize processing window cron:', error);
+    }
+  },
+  null,
+  true,
+  'Australia/Sydney'
+);
+
+// Periodic Shopify tracking sync for shipped orders
+new CronJob(
+  '0 */30 * * * *', // every 30 minutes
+  async function () {
+    try {
+      const storeDomain = process.env.SHOPIFY_STORE_DOMAIN;
+      const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+      if (!storeDomain || !accessToken) {
+        return;
+      }
+
+      const pending = await UserPrize.find({
+        ShopifyOrderId: { $ne: null },
+        Status: { $in: ['processing', 'waiting'] },
+        IsDeleted: false,
+      });
+
+      if (!pending.length) {
+        return;
+      }
+
+      for (const item of pending) {
+        const resp = await fetch(
+          `https://${storeDomain}/admin/api/2023-10/orders/${item.ShopifyOrderId}/fulfillments.json`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Shopify-Access-Token': accessToken,
+            },
+          }
+        );
+
+        if (!resp.ok) {
+          continue;
+        }
+
+        const data = await resp.json();
+        const fulfillments = data && data.fulfillments ? data.fulfillments : [];
+        if (!fulfillments.length) {
+          continue;
+        }
+
+        const latest = fulfillments[fulfillments.length - 1];
+        const trackingNumber =
+          (latest.tracking_numbers && latest.tracking_numbers[0]) ||
+          latest.tracking_number ||
+          '';
+
+        item.TrackingNumber = trackingNumber || item.TrackingNumber;
+        item.Status = 'shipped';
+        item.ShippedAt = new Date();
+        item.TrackingHistory = item.TrackingHistory || [];
+        item.TrackingHistory.push({
+          Status: latest.status || 'shipped',
+          Location: '',
+          Timestamp: new Date(),
+          Raw: latest,
+        });
+        await item.save();
+      }
+
+      console.log(
+        `Shopify sync cron: processed ${pending.length} order(s) for tracking updates`
+      );
+    } catch (error) {
+      console.error('Error in Shopify tracking sync cron:', error);
+    }
+  },
+  null,
+  true,
+  'Australia/Sydney'
 );

@@ -28,6 +28,11 @@ const packagesSchema = new schema({
     type: Boolean,
     default: false,
   },
+  FulfillmentPackageId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'fulfillment-packages',
+    default: null,
+  },
   IsActive: {
     type: Boolean,
     default: true,
