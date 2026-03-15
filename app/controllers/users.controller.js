@@ -1198,11 +1198,13 @@ exports.purchaseBankFulPackage = async function (req, res) {
         message: `No user found`
       });
     }
-    var packageData = await PackagesModel.findOne({ Price: amount });
+    // Price is stored as string in DB; match whether client sends number or string
+    const amountStr = amount != null ? String(amount) : "";
+    var packageData = await PackagesModel.findOne({ Price: amountStr });
     if (!packageData) {
-      return res.json({
+      return res.status(404).json({
         success: false,
-        message: "Package not found",
+        message: "Package not found. No coin package exists with Price matching this amount. Create a package in Admin (Players → Packages) with the same Price, or use an amount that matches an existing package.",
         data: null,
       });
     }
