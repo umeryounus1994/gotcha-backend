@@ -88,7 +88,9 @@ exports.list = async function (req, res) {
     __v: 0,
   };
   let findCoins = await UserCoins.findOne({ UserId: UserId });
-  if (!findCoins || findCoins?.HeldCoins < 200000) {
+  const heldCoins = findCoins?.HeldCoins || 0;
+  const bonusCoins = findCoins?.BonusCoins || 0;
+  if (!findCoins || (heldCoins < 200000 && bonusCoins < 200000)) {
     return res.json({
       success: false,
       message: 'Not enough coins to teleport',
@@ -574,16 +576,47 @@ exports.get = async function (req, res) {
   var distance = parseInt(req.body.distance);
 
   let findCoins = await UserCoins.findOne({ UserId: userId });
-  if (coinType === 'BonusCoins') {
-    if (!findCoins || (findCoins?.BonusCoins || 0) < 200000) {
+  if (!findCoins) {
+    return res.json({
+      success: false,
+      message: 'Not enough coins to plant this offer',
+      data: null,
+    });
+  }
+
+  const COST = 200000;
+  const heldCoins = findCoins?.HeldCoins || 0;
+  const bonusCoins = findCoins?.BonusCoins || 0;
+  const normalizedCoinType = coinType === 'BonusCoins' || coinType === 'HeldCoins'
+    ? coinType
+    : null;
+
+  if (normalizedCoinType === 'BonusCoins') {
+    if (bonusCoins < COST) {
       return res.json({
         success: false,
         message: 'Not enough bonus coins to plant this offer',
         data: null,
       });
     }
+    findCoins.BonusCoins = bonusCoins - COST;
+  } else if (normalizedCoinType === 'HeldCoins') {
+    if (heldCoins < COST) {
+      return res.json({
+        success: false,
+        message: 'Not enough coins to plant this offer',
+        data: null,
+      });
+    }
+    findCoins.HeldCoins = heldCoins - COST;
   } else {
-    if (!findCoins || (findCoins?.HeldCoins || 0) < 200000) {
+    // Fallback when client does not pass coinType: try Held first, then Bonus.
+    if (heldCoins >= COST) {
+      findCoins.HeldCoins = heldCoins - COST;
+    } else if (bonusCoins >= COST) {
+      findCoins.BonusCoins = bonusCoins - COST;
+      coinType = 'BonusCoins';
+    } else {
       return res.json({
         success: false,
         message: 'Not enough coins to plant this offer',
@@ -591,12 +624,8 @@ exports.get = async function (req, res) {
       });
     }
   }
-    if (coinType === 'BonusCoins') {
-      findCoins.BonusCoins = findCoins?.BonusCoins - 200000;
-    } else {
-      findCoins.HeldCoins = findCoins?.HeldCoins - 200000;
-    }
-    await findCoins.save();
+
+  await findCoins.save();
 
   //console.log("lat ",lat, ' lng: ', lng, ' distance: ',distance, ' userId: ',userId)
   // let currentLocation = {
