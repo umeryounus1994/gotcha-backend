@@ -1181,7 +1181,7 @@ exports.purchaseBankFulPackage = async function (req, res) {
   const missingFields = [];
 
   if (!paymentData) missingFields.push("paymentData");
-  if (!amount) missingFields.push("amount");
+  if (amount === undefined || amount === null || amount === "") missingFields.push("amount");
   if (!userId) missingFields.push("userId");
 
   if (missingFields.length > 0) {
@@ -1198,19 +1198,50 @@ exports.purchaseBankFulPackage = async function (req, res) {
         message: `No user found`
       });
     }
-    // Price is stored as string in DB; match whether client sends number or string
+    // If fulfillment package is provided, validate amount against
+    // fulfillment SubscriptionPriceWeekly. Otherwise, use coin package price.
+    const amountNum = Number(amount);
     const amountStr = amount != null ? String(amount) : "";
-    var packageData = await PackagesModel.findOne({ Price: amountStr });
-    if (!packageData) {
-      return res.status(404).json({
-        success: false,
-        message: "Package not found. No coin package exists with Price matching this amount. Create a package in Admin (Players → Packages) with the same Price, or use an amount that matches an existing package.",
-        data: null,
+    let packageData = null;
+    let linkedFulfillmentId = bodyFulfillmentPackageId || null;
+
+    if (bodyFulfillmentPackageId) {
+      const selectedFulfillmentPkg = await FulfillmentPackage.findOne({
+        _id: bodyFulfillmentPackageId,
+        IsDeleted: false,
       });
+      if (!selectedFulfillmentPkg) {
+        return res.status(404).json({
+          success: false,
+          message: "Fulfillment package not found",
+          data: null,
+        });
+      }
+
+      const weeklyPriceNum = Number(selectedFulfillmentPkg.SubscriptionPriceWeekly || 0);
+      if (Number.isNaN(amountNum) || weeklyPriceNum !== amountNum) {
+        return res.status(400).json({
+          success: false,
+          message: "Amount must match fulfillment package SubscriptionPriceWeekly",
+          data: {
+            expected: weeklyPriceNum,
+            received: amountNum,
+          },
+        });
+      }
+    } else {
+      // Coin package purchase flow (backward compatible)
+      packageData = await PackagesModel.findOne({ Price: amountStr });
+      if (!packageData) {
+        return res.status(404).json({
+          success: false,
+          message: "Package not found. No coin package exists with Price matching this amount. Create a package in Admin (Players → Packages) with the same Price, or use an amount that matches an existing package.",
+          data: null,
+        });
+      }
+      linkedFulfillmentId = packageData.FulfillmentPackageId || null;
     }
 
-    // Link to fulfillment package: from request body or from coin package
-    const linkedFulfillmentId = bodyFulfillmentPackageId || packageData.FulfillmentPackageId;
     if (linkedFulfillmentId) {
       const pkg = await FulfillmentPackage.findOne({
         _id: linkedFulfillmentId,
