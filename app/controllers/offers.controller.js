@@ -2,6 +2,7 @@ let Offers = require('../models/offers.model');
 let OffersHeld = require('../models/offer-held.model');
 let OffersClaimedModel = require('../models/offer-claimed.model');
 let UserCoins = require('../models/user-coins.model');
+let Prizes = require('../models/prizes.model');
 const uploadIcon = require('../utilities/uploaders/map-icon.uploader');
 const haversine = require('haversine');
 var moment = require('moment'); // require
@@ -302,9 +303,22 @@ exports.holdOffer = async function (req, res) {
 
   let offerData = await Offers.findById(OfferId);
   if (!offerData) {
+    // Check prizes collection too for better guidance when client
+    // accidentally sends PrizeId in OfferId.
+    const prizeData = await Prizes.findById(OfferId);
+    if (prizeData) {
+      return res.json({
+        success: false,
+        message: 'Prize id was provided in OfferId. Use OfferId from offers collection for /offers/hold-offer, or use /prizes/claim for prize flow.',
+        data: {
+          providedIdType: 'prize',
+          suggestedEndpoint: '/api/prizes/claim',
+        },
+      });
+    }
     return res.json({
       success: false,
-      message: 'Offer not found.',
+      message: 'Offer not found in offers or prizes collections.',
       data: null,
     });
   }
