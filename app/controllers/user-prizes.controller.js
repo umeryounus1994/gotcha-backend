@@ -65,7 +65,13 @@ exports.listActive = async function (req, res) {
       Status: "active",
       IsDeleted: false,
     })
-      .populate("PrizeId")
+      .populate({
+        path: "PrizeId",
+        populate: {
+          path: "MainPrizePoolId",
+          select: "SKUPhoto Product PrizeValue",
+        },
+      })
       .sort({ CreationTimestamp: -1 });
 
     return res.json({
@@ -93,7 +99,13 @@ exports.listSecured = async function (req, res) {
       Status: { $in: ["secured", "waiting", "processing", "shipped"] },
       IsDeleted: false,
     })
-      .populate("PrizeId")
+      .populate({
+        path: "PrizeId",
+        populate: {
+          path: "MainPrizePoolId",
+          select: "SKUPhoto Product PrizeValue",
+        },
+      })
       .sort({ CreationTimestamp: -1 });
 
     return res.json({

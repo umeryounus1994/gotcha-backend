@@ -89,6 +89,8 @@ exports.login = function (req, res) {
                 expiresIn: "10d", // expires in 10 days
               });
 
+              await autoSyncTeamMembershipForUser(user);
+
               res.json({
                 success: true,
                 message: "Welcome Back!",
@@ -202,6 +204,8 @@ exports.signup = function (req, res) {
                 expiresIn: "10d", // expires in 10 days
               });
 
+              autoSyncTeamMembershipForUser(user);
+
               console.log("New User Registered.");
               res.json({
                 success: true,
@@ -226,6 +230,31 @@ module.exports.updateUserProfile = async (useerId, userForm, options, callback) 
 // Get All Notification User 
 module.exports.getAllNotificationUser = (callback) => {
   Users.find({ Token: { $ne: "" }, IsDeleted: false, IsActive: true }, callback);
+}
+
+// Option 1 flow support: auto-join invited team entries after login/signup.
+async function autoSyncTeamMembershipForUser(user) {
+  try {
+    if (!user || !user._id) return;
+    const email = String(user.Email || "").toLowerCase().trim();
+    if (!email) return;
+
+    await UserTeam.updateMany(
+      {
+        InvitedEmail: email,
+        Status: "invited",
+      },
+      {
+        $set: {
+          JoinedUserId: user._id,
+          Status: "joined",
+        },
+      }
+    );
+  } catch (error) {
+    // Best-effort sync; should not block authentication response.
+    console.error("Auto team sync failed:", error?.message || error);
+  }
 }
 
 module.exports.saveWatchadCoins = async function (req, res) {
@@ -848,6 +877,8 @@ exports.socialLogin = function (req, res) {
             expiresIn: "10d", // expires in 10 days
           });
 
+          autoSyncTeamMembershipForUser(user);
+
           res.json({
             success: true,
             message: "Welcome Back!",
@@ -890,6 +921,8 @@ exports.socialLogin = function (req, res) {
               let token = jwt.sign(userData, Constants.JWT.secret, {
                 expiresIn: "10d", // expires in 10 days
               });
+
+              autoSyncTeamMembershipForUser(user);
 
               console.log("New User Registered.");
               res.json({
